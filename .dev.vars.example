@@ -1,0 +1,12 @@
+# このファイルをコピーして .dev.vars を作成してください
+# cp .dev.vars.example .dev.vars
+
+# 管理者操作用APIキー（板の作成・削除、スレッド・投稿の削除）
+ADMIN_API_KEY=your-admin-api-key-here
+
+# Google reCAPTCHA v2 シークレットキー
+# テスト用キーはこちら: https://developers.google.com/recaptcha/docs/faq
+RECAPTCHA_SECRET_KEY=your-recaptcha-secret-key-here
+
+# 開発環境でreCAPTCHAをスキップする場合は true に設定
+DISABLE_RECAPTCHA=true

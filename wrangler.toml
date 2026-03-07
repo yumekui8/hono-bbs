@@ -1,0 +1,8 @@
+name = "hono-bbs"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hono-bbs-db"
+database_id = "4e6519e4-a09b-40f1-9e56-9bf0930ae729"
