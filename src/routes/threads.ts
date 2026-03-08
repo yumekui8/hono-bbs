@@ -2,15 +2,20 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import {
   getThreadsHandler,
+  getThreadWithPostsHandler,
   createThreadHandler,
+  updateThreadHandler,
   deleteThreadHandler,
 } from '../handlers/threadHandler'
-import { adminAuth } from '../middleware/adminAuth'
+import { requireLogin } from '../middleware/auth'
+import { requireTurnstile } from '../middleware/turnstile'
 
 const threads = new Hono<AppEnv>()
 
 threads.get('/', getThreadsHandler)
-threads.post('/', createThreadHandler)
-threads.delete('/:threadId', adminAuth, deleteThreadHandler)
+threads.get('/:threadId', getThreadWithPostsHandler)
+threads.post('/', requireTurnstile, createThreadHandler)
+threads.put('/:threadId', requireLogin, requireTurnstile, updateThreadHandler)
+threads.delete('/:threadId', requireLogin, requireTurnstile, deleteThreadHandler)
 
 export default threads

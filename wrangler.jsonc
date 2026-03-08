@@ -6,9 +6,9 @@
 	// "compatibility_flags": [
 	//   "nodejs_compat"
 	// ],
-	// "vars": {
-	//   "MY_VAR": "my-variable"
-	// },
+	"vars": {
+		"API_BASE_PATH": "/api/v1"
+	},
 	// "kv_namespaces": [
 	//   {
 	//     "binding": "MY_KV_NAMESPACE",
@@ -35,9 +35,12 @@
 	//   "enabled": true,
 	//   "head_sampling_rate": 1
 	// }
-	"assets": {
-		"directory": "./public",
-	},
+	"kv_namespaces": [
+		{
+			"binding": "SESSION_KV",
+			"id": "d442ba006a6248db887373682968e417"
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",

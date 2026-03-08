@@ -1,33 +1,125 @@
 import { z } from 'zod'
-import type { Board } from '../types'
+import type { Board, IdFormat } from '../types'
 import * as boardRepository from '../repository/boardRepository'
+import { hasPermission, PERM } from '../utils/permission'
+
+const ID_FORMATS: IdFormat[] = ['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']
 
 const createBoardSchema = z.object({
+  id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_\-\.]+$/, 'IDは英数字・_・-・. のみ使用できます').optional(),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  ownerUserId: z.string().optional(),
+  ownerGroupId: z.string().optional(),
+  permissions: z.string().regex(/^\d+,\d+,\d+$/).optional(),
+  maxThreads: z.number().int().min(1).max(100000).optional(),
+  maxThreadTitleLength: z.number().int().min(1).max(1000).optional(),
+  defaultMaxPosts: z.number().int().min(1).optional(),
+  defaultMaxPostLength: z.number().int().min(1).optional(),
+  defaultMaxPostLines: z.number().int().min(1).optional(),
+  defaultMaxPosterNameLength: z.number().int().min(1).optional(),
+  defaultMaxPosterSubInfoLength: z.number().int().min(1).optional(),
+  defaultMaxPosterMetaInfoLength: z.number().int().min(1).optional(),
+  defaultPosterName: z.string().max(50).optional(),
+  defaultIdFormat: z.enum(['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']).optional(),
+  defaultThreadOwnerUserId: z.string().optional(),
+  defaultThreadOwnerGroupId: z.string().optional(),
+  defaultThreadPermissions: z.string().regex(/^\d+,\d+,\d+$/).optional(),
+})
+
+const updateBoardSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).nullable().optional(),
+  maxThreads: z.number().int().min(1).max(100000).optional(),
+  defaultMaxPosts: z.number().int().min(1).optional(),
+  defaultMaxPostLength: z.number().int().min(1).optional(),
+  defaultPosterName: z.string().max(50).optional(),
+  defaultIdFormat: z.enum(['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']).optional(),
 })
 
 export type CreateBoardInput = z.infer<typeof createBoardSchema>
+export type UpdateBoardInput = z.infer<typeof updateBoardSchema>
 
 export function parseCreateBoard(data: unknown): CreateBoardInput {
   return createBoardSchema.parse(data)
+}
+
+export function parseUpdateBoard(data: unknown): UpdateBoardInput {
+  return updateBoardSchema.parse(data)
 }
 
 export async function getBoards(db: D1Database): Promise<Board[]> {
   return boardRepository.findBoards(db)
 }
 
-export async function createBoard(db: D1Database, input: CreateBoardInput): Promise<Board> {
+export async function createBoard(
+  db: D1Database,
+  input: CreateBoardInput,
+  creatorUserId: string | null,
+  creatorPrimaryGroupId: string | null,
+  creatorSessionId: string | null,
+  creatorTurnstileSessionId: string | null,
+): Promise<Board> {
   const board: Board = {
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
+    // 所有者は作成者をデフォルトとし、明示指定があればそちらを優先
+    ownerUserId: input.ownerUserId ?? creatorUserId,
+    ownerGroupId: input.ownerGroupId ?? creatorPrimaryGroupId,
+    permissions: input.permissions ?? '15,12,12',
     name: input.name,
     description: input.description ?? null,
+    maxThreads: input.maxThreads ?? 1000,
+    maxThreadTitleLength: input.maxThreadTitleLength ?? 200,
+    defaultMaxPosts: input.defaultMaxPosts ?? 1000,
+    defaultMaxPostLength: input.defaultMaxPostLength ?? 2000,
+    defaultMaxPostLines: input.defaultMaxPostLines ?? 100,
+    defaultMaxPosterNameLength: input.defaultMaxPosterNameLength ?? 50,
+    defaultMaxPosterSubInfoLength: input.defaultMaxPosterSubInfoLength ?? 100,
+    defaultMaxPosterMetaInfoLength: input.defaultMaxPosterMetaInfoLength ?? 200,
+    defaultPosterName: input.defaultPosterName ?? '名無し',
+    defaultIdFormat: input.defaultIdFormat ?? 'daily_hash',
+    defaultThreadOwnerUserId: input.defaultThreadOwnerUserId ?? null,
+    defaultThreadOwnerGroupId: input.defaultThreadOwnerGroupId ?? null,
+    defaultThreadPermissions: input.defaultThreadPermissions ?? '15,12,12',
     createdAt: new Date().toISOString(),
+    adminMeta: { creatorUserId, creatorSessionId, creatorTurnstileSessionId },
   }
   await boardRepository.insertBoard(db, board)
   return board
 }
 
-export async function deleteBoard(db: D1Database, id: string): Promise<boolean> {
-  return boardRepository.deleteBoard(db, id)
+export async function updateBoard(
+  db: D1Database,
+  boardId: string,
+  input: UpdateBoardInput,
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+): Promise<Board | null> {
+  const board = await boardRepository.findBoardById(db, boardId)
+  if (!board) return null
+
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, required: PERM.ADMIN, isAdmin })) {
+    throw new Error('FORBIDDEN')
+  }
+
+  await boardRepository.updateBoard(db, boardId, input)
+  return boardRepository.findBoardById(db, boardId)
+}
+
+export async function deleteBoard(
+  db: D1Database,
+  boardId: string,
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+): Promise<boolean> {
+  const board = await boardRepository.findBoardById(db, boardId)
+  if (!board) return false
+
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, required: PERM.DELETE, isAdmin })) {
+    throw new Error('FORBIDDEN')
+  }
+
+  return boardRepository.deleteBoard(db, boardId)
 }
