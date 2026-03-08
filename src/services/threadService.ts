@@ -61,7 +61,6 @@ export async function createThread(
   userId: string | null,
   userGroupIds: string[],
   isAdmin: boolean,
-  userToken: string | null,
   sessionId: string | null,
   turnstileSessionId: string | null,
 ): Promise<{ thread: Thread; firstPost: Post }> {
@@ -113,7 +112,7 @@ export async function createThread(
 
   // 第1レスを作成
   const idFormat = board.defaultIdFormat
-  const displayUserId = await computeDisplayUserId(idFormat, userId, userToken)
+  const displayUserId = await computeDisplayUserId(idFormat, userId, turnstileSessionId)
   const posterName = input.posterName ?? board.defaultPosterName
 
   const firstPost: Post = {

@@ -29,7 +29,6 @@ export async function createPost(
   input: CreatePostInput,
   userId: string | null,
   userGroupIds: string[],
-  userToken: string | null,
   isAdmin: boolean,
   sessionId: string | null,
   turnstileSessionId: string | null,
@@ -57,7 +56,7 @@ export async function createPost(
 
   // IDフォーマット (スレッド設定 → 板デフォルト)
   const idFormat = thread.idFormat ?? board.defaultIdFormat
-  const displayUserId = await computeDisplayUserId(idFormat, userId, userToken)
+  const displayUserId = await computeDisplayUserId(idFormat, userId, turnstileSessionId)
 
   // 投稿者名 (入力 → スレッドデフォルト → 板デフォルト)
   const posterName = input.posterName ?? thread.posterName ?? board.defaultPosterName

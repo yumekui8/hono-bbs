@@ -112,7 +112,6 @@ export type AppEnv = {
     userId: string | null           // セッションから取得したユーザID
     isAdmin: boolean                // sys-user-admin-group メンバーかどうか
     userGroupIds: string[]          // ユーザが所属するグループID一覧
-    userToken: string | null        // 匿名ユーザのトークン (X-User-Token)
     primaryGroupId: string | null   // ユーザのプライマリグループID
   }
 }

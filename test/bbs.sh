@@ -8,8 +8,6 @@ API="${BASE_URL}${API_BASE_PATH}"
 # セッション情報 (ログイン後に設定)
 SESSION_ID=""
 SESSION_USERNAME=""
-# 匿名ユーザトークン (起動時にランダム生成)
-USER_TOKEN=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || date +%s%N)
 
 # verboseログ設定 (-v/--verbose オプション時のみ出力)
 VERBOSE=false
@@ -104,7 +102,7 @@ api_get() {
 
 api_post() {
   local path="$1" body="$2"
-  local headers=(-H "Content-Type: application/json" -H "X-User-Token: $USER_TOKEN")
+  local headers=(-H "Content-Type: application/json")
   [ -n "$SESSION_ID" ]          && headers+=(-H "X-Session-Id: $SESSION_ID")
   [ -n "$TURNSTILE_SESSION_ID" ] && headers+=(-H "X-Turnstile-Session: $TURNSTILE_SESSION_ID")
   _curl -s -X POST "${headers[@]}" "$API$path" -d "$body" 2>/dev/null
@@ -112,7 +110,7 @@ api_post() {
 
 api_put() {
   local path="$1" body="$2"
-  local headers=(-H "Content-Type: application/json" -H "X-User-Token: $USER_TOKEN")
+  local headers=(-H "Content-Type: application/json")
   [ -n "$SESSION_ID" ]          && headers+=(-H "X-Session-Id: $SESSION_ID")
   [ -n "$TURNSTILE_SESSION_ID" ] && headers+=(-H "X-Turnstile-Session: $TURNSTILE_SESSION_ID")
   _curl -s -X PUT "${headers[@]}" "$API$path" -d "$body" 2>/dev/null
@@ -131,7 +129,7 @@ show_login_status() {
   if [ -n "$SESSION_ID" ]; then
     echo -e "  ${GREEN}ログイン中: $SESSION_USERNAME${NC}"
   else
-    echo -e "  ${DIM}未ログイン (匿名トークン: ${USER_TOKEN:0:8}...)${NC}"
+    echo -e "  ${DIM}未ログイン${NC}"
   fi
 }
 

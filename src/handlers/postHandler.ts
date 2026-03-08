@@ -30,7 +30,7 @@ export async function createPostHandler(c: Context<AppEnv>): Promise<Response> {
     const input = postService.parseCreatePost(body)
     const post = await postService.createPost(
       c.env.DB, boardId, threadId, input,
-      c.get('userId'), c.get('userGroupIds'), c.get('userToken'), c.get('isAdmin'),
+      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )

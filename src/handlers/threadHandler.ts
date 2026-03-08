@@ -56,7 +56,6 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
     const result = await threadService.createThread(
       c.env.DB, boardId, input,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
-      c.get('userToken'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )

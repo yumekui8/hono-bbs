@@ -13,19 +13,20 @@ export function todayUTC(): string {
 }
 
 // IDフォーマットに基づき表示用IDを計算
-// userToken: 匿名ユーザがクライアントで生成・保持するトークン (X-User-Token ヘッダー)
+// turnstileSessionId: TurnstileセッションのセッションID。匿名ID生成の種として使用。
+//   Turnstileセッションを取り直すとIDも変わる。
 // userId: ログイン済みユーザのID (セッションから取得)
 export async function computeDisplayUserId(
   idFormat: string,
   userId: string | null,
-  userToken: string | null,
+  turnstileSessionId: string | null,
 ): Promise<string> {
-  const anonKey = userToken ?? 'anonymous'
+  const anonKey = turnstileSessionId ?? 'anonymous'
   const today = todayUTC()
 
   switch (idFormat) {
     case 'daily_hash':
-      // 全員: APIキー(userToken)+日付の日毎ハッシュ
+      // 全員: TurnstileセッションID+日付の日毎ハッシュ
       return hashPrefix(`${anonKey}:${today}`)
 
     case 'daily_hash_or_user':
@@ -34,11 +35,11 @@ export async function computeDisplayUserId(
       return hashPrefix(`${anonKey}:${today}`)
 
     case 'api_key_hash':
-      // 全員: APIキー(userToken)のハッシュ
+      // 全員: TurnstileセッションIDのハッシュ
       return hashPrefix(anonKey)
 
     case 'api_key_hash_or_user':
-      // 匿名: APIキーハッシュ / ログイン済み: ユーザID先頭10文字
+      // 匿名: TurnstileセッションIDハッシュ / ログイン済み: ユーザID先頭10文字
       if (userId) return userId.slice(0, 10)
       return hashPrefix(anonKey)
 

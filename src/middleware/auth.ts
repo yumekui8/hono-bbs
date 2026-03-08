@@ -8,9 +8,6 @@ import { SYSTEM_BBS_ADMIN_GROUP_ID, SYSTEM_USER_ADMIN_GROUP_ID } from '../utils/
 // 全ルートに適用: セッション・管理者フラグ・userToken をコンテキストに設定する
 // 認証失敗でもブロックしない (権限チェックは各サービスで行う)
 export const authContext: MiddlewareHandler<AppEnv> = async (c, next) => {
-  // 匿名ユーザトークン (IDハッシュ計算用)
-  c.set('userToken', c.req.header('X-User-Token') ?? null)
-
   // セッションチェック
   const sessionId = c.req.header('X-Session-Id')
   if (sessionId) {
