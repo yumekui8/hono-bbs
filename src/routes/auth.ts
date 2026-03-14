@@ -3,20 +3,26 @@ import type { AppEnv } from '../types'
 import {
   turnstilePageHandler,
   turnstileVerifyHandler,
+  getSetupInfoHandler,
   setupHandler,
-  registerHandler,
+  getLoginInfoHandler,
   loginHandler,
+  getLogoutInfoHandler,
   logoutHandler,
 } from '../handlers/authHandler'
-import { requireTurnstile } from '../middleware/turnstile'
 
 const auth = new Hono<AppEnv>()
 
 auth.get('/turnstile', turnstilePageHandler)
 auth.post('/turnstile', turnstileVerifyHandler)
+
+auth.get('/setup', getSetupInfoHandler)
 auth.post('/setup', setupHandler)
-auth.post('/signup', requireTurnstile, registerHandler)
-auth.post('/signin', requireTurnstile, loginHandler)
+
+auth.get('/login', getLoginInfoHandler)
+auth.post('/login', loginHandler)
+
+auth.get('/logout', getLogoutInfoHandler)
 auth.post('/logout', logoutHandler)
 
 export default auth

@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import type { Board, IdFormat } from '../types'
+import type { SystemIds } from '../utils/constants'
+import type { EndpointPermissionsMap } from '../utils/endpointPermissions'
+import { getEndpointPermConfig } from '../utils/endpointPermissions'
 import * as boardRepository from '../repository/boardRepository'
-import { hasPermission, PERM } from '../utils/permission'
-
-const ID_FORMATS: IdFormat[] = ['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']
+import { hasPermission } from '../utils/permission'
 
 const createBoardSchema = z.object({
   id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_\-\.]+$/, 'IDは英数字・_・-・. のみ使用できます').optional(),
@@ -11,7 +12,7 @@ const createBoardSchema = z.object({
   description: z.string().max(500).optional(),
   ownerUserId: z.string().optional(),
   ownerGroupId: z.string().optional(),
-  permissions: z.string().regex(/^\d+,\d+,\d+$/).optional(),
+  permissions: z.string().regex(/^\d+,\d+,\d+,\d+$/).optional(),
   maxThreads: z.number().int().min(1).max(100000).optional(),
   maxThreadTitleLength: z.number().int().min(1).max(1000).optional(),
   defaultMaxPosts: z.number().int().min(1).optional(),
@@ -24,12 +25,15 @@ const createBoardSchema = z.object({
   defaultIdFormat: z.enum(['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']).optional(),
   defaultThreadOwnerUserId: z.string().optional(),
   defaultThreadOwnerGroupId: z.string().optional(),
-  defaultThreadPermissions: z.string().regex(/^\d+,\d+,\d+$/).optional(),
+  defaultThreadPermissions: z.string().regex(/^\d+,\d+,\d+,\d+$/).optional(),
 })
 
 const updateBoardSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
+  ownerUserId: z.string().nullable().optional(),
+  ownerGroupId: z.string().nullable().optional(),
+  permissions: z.string().regex(/^\d+,\d+,\d+,\d+$/).optional(),
   maxThreads: z.number().int().min(1).max(100000).optional(),
   defaultMaxPosts: z.number().int().min(1).optional(),
   defaultMaxPostLength: z.number().int().min(1).optional(),
@@ -48,8 +52,38 @@ export function parseUpdateBoard(data: unknown): UpdateBoardInput {
   return updateBoardSchema.parse(data)
 }
 
-export async function getBoards(db: D1Database): Promise<Board[]> {
-  return boardRepository.findBoards(db)
+export async function getBoards(
+  db: D1Database,
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+): Promise<Board[]> {
+  const boards = await boardRepository.findBoards(db)
+  if (isAdmin) return boards
+  // 読み取り権限のない板はリストから除外
+  return boards.filter(b => hasPermission({
+    userId, userGroupIds,
+    ownerUserId: b.ownerUserId, ownerGroupId: b.ownerGroupId,
+    permissions: b.permissions, operation: 'GET', isAdmin,
+  }))
+}
+
+// /boards コレクションの POST 権限チェック (板作成権限)
+// ENDPOINT_PERMISSIONS の '/boards' 設定に基づいて確認する
+export function checkBoardsCollectionPermission(
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+  customPerms: EndpointPermissionsMap,
+  sysIds: SystemIds,
+): boolean {
+  if (isAdmin) return true
+  const config = getEndpointPermConfig('/boards', customPerms, sysIds)
+  return hasPermission({
+    userId, userGroupIds,
+    ownerUserId: config.ownerUserId, ownerGroupId: config.ownerGroupId,
+    permissions: config.permissions, operation: 'POST', isAdmin,
+  })
 }
 
 export async function createBoard(
@@ -62,10 +96,10 @@ export async function createBoard(
 ): Promise<Board> {
   const board: Board = {
     id: input.id ?? crypto.randomUUID(),
-    // 所有者は作成者をデフォルトとし、明示指定があればそちらを優先
     ownerUserId: input.ownerUserId ?? creatorUserId,
     ownerGroupId: input.ownerGroupId ?? creatorPrimaryGroupId,
-    permissions: input.permissions ?? '15,12,12',
+    // "owner,group,auth,anon" 形式: owner=全操作, group=全操作-DELETE, auth=GET+POST, anon=GET+POST
+    permissions: input.permissions ?? '15,14,12,12',
     name: input.name,
     description: input.description ?? null,
     maxThreads: input.maxThreads ?? 1000,
@@ -80,7 +114,7 @@ export async function createBoard(
     defaultIdFormat: input.defaultIdFormat ?? 'daily_hash',
     defaultThreadOwnerUserId: input.defaultThreadOwnerUserId ?? null,
     defaultThreadOwnerGroupId: input.defaultThreadOwnerGroupId ?? null,
-    defaultThreadPermissions: input.defaultThreadPermissions ?? '15,12,12',
+    defaultThreadPermissions: input.defaultThreadPermissions ?? '15,14,12,12',
     createdAt: new Date().toISOString(),
     adminMeta: { creatorUserId, creatorSessionId, creatorTurnstileSessionId },
   }
@@ -99,7 +133,7 @@ export async function updateBoard(
   const board = await boardRepository.findBoardById(db, boardId)
   if (!board) return null
 
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, required: PERM.ADMIN, isAdmin })) {
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, operation: 'PUT', isAdmin })) {
     throw new Error('FORBIDDEN')
   }
 
@@ -117,7 +151,7 @@ export async function deleteBoard(
   const board = await boardRepository.findBoardById(db, boardId)
   if (!board) return false
 
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, required: PERM.DELETE, isAdmin })) {
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, operation: 'DELETE', isAdmin })) {
     throw new Error('FORBIDDEN')
   }
 

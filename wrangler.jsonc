@@ -7,7 +7,16 @@
 	//   "nodejs_compat"
 	// ],
 	"vars": {
-		"API_BASE_PATH": "/api/v1"
+		"API_BASE_PATH": "/api/v1",
+		"USER_DISPLAY_LIMIT": "0",
+		"GROUP_DISPLAY_LIMIT": "0",
+    "CORS_ORIGIN": "https://hono-bbs-webui.pages.dev",
+    "ALLOW_BBS_UI_DOMAINS": "hono-bbs-webui.pages.dev"
+    // ADMIN_USERNAME: 管理者ユーザID (デフォルト: admin)
+    // USER_ADMIN_GROUP: ユーザ管理グループID (デフォルト: user-admin-group)
+    // BBS_ADMIN_GROUP: 掲示板管理グループID (デフォルト: bbs-admin-group)
+    // ENDPOINT_PERMISSIONS: エンドポイント権限JSON (省略時はデフォルト値を使用)
+    // MAX_REQUEST_SIZE: リクエストサイズ上限 例: "1mb", "500kb" (省略時は無制限)
 	},
 	// "kv_namespaces": [
 	//   {
@@ -38,7 +47,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "SESSION_KV",
-			"id": "d442ba006a6248db887373682968e417"
+			"id": "76b11c8afc3a4fc0a6cda222c739986a"
 		}
 	],
 	"d1_databases": [

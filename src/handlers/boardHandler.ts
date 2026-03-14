@@ -2,12 +2,12 @@ import type { Context } from 'hono'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import type { AppEnv, Board } from '../types'
 import * as boardService from '../services/boardService'
-import { SYSTEM_USER_ADMIN_GROUP_ID, SYSTEM_BBS_ADMIN_GROUP_ID } from '../utils/constants'
+import { getSystemIds } from '../utils/constants'
+import { parseEndpointPermissions, getEndpointPermConfig } from '../utils/endpointPermissions'
 
 // userAdminGroup または bbsAdminGroup メンバーのみ adminMeta を参照できる
 function adminVisible(c: Context<AppEnv>): boolean {
-  const groups = c.get('userGroupIds')
-  return groups.includes(SYSTEM_USER_ADMIN_GROUP_ID) || groups.includes(SYSTEM_BBS_ADMIN_GROUP_ID)
+  return c.get('isAdmin') || c.get('isUserAdmin')
 }
 
 function stripAdminMeta(board: Board, visible: boolean): Board | Omit<Board, 'adminMeta'> {
@@ -16,13 +16,33 @@ function stripAdminMeta(board: Board, visible: boolean): Board | Omit<Board, 'ad
   return rest
 }
 
+// GET /boards
 export async function getBoardsHandler(c: Context<AppEnv>): Promise<Response> {
-  const boards = await boardService.getBoards(c.env.DB)
+  const boards = await boardService.getBoards(c.env.DB, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'))
   const visible = adminVisible(c)
-  return c.json({ data: boards.map(b => stripAdminMeta(b, visible)) })
+  const sysIds = getSystemIds(c.env)
+  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
+  const endpointConfig = getEndpointPermConfig('/boards', customPerms, sysIds)
+  return c.json({
+    data: boards.map(b => stripAdminMeta(b, visible)),
+    endpoint: endpointConfig,
+  })
 }
 
+// POST /boards
 export async function createBoardHandler(c: Context<AppEnv>): Promise<Response> {
+  const sysIds = getSystemIds(c.env)
+  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
+
+  // /boards コレクションの POST 権限チェック
+  const allowed = boardService.checkBoardsCollectionPermission(
+    c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    customPerms, sysIds,
+  )
+  if (!allowed) {
+    return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions to create board' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const input = boardService.parseCreateBoard(body)
@@ -38,6 +58,7 @@ export async function createBoardHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
+// PUT /boards/:boardId
 export async function updateBoardHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   try {
@@ -58,6 +79,7 @@ export async function updateBoardHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
+// DELETE /boards/:boardId
 export async function deleteBoardHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   try {

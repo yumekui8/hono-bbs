@@ -14,6 +14,8 @@ export async function findSessionById(kv: KVNamespace, id: string): Promise<Sess
     await kv.delete(SESSION_PREFIX + id)
     return null
   }
+  // isActive=false のセッションは無効化済みとして扱う
+  if (data.isActive === false) return null
   return data
 }
 
@@ -26,6 +28,19 @@ export async function insertSession(kv: KVNamespace, session: Session): Promise<
 
 export async function deleteSession(kv: KVNamespace, id: string): Promise<void> {
   await kv.delete(SESSION_PREFIX + id)
+}
+
+// セッションの isActive フラグを更新する (管理者によるセッション無効化に使用)
+export async function updateSessionActive(kv: KVNamespace, id: string, isActive: boolean): Promise<boolean> {
+  const data = await kv.get<Session>(SESSION_PREFIX + id, 'json')
+  if (!data) return false
+  const updated: Session = { ...data, isActive }
+  const ttlSeconds = Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
+  if (ttlSeconds <= 0) return false
+  await kv.put(SESSION_PREFIX + id, JSON.stringify(updated), {
+    expirationTtl: Math.max(ttlSeconds, 60),
+  })
+  return true
 }
 
 // ── Turnstile セッション ────────────────────────────────────

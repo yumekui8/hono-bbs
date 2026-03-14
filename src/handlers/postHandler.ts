@@ -2,11 +2,8 @@ import type { Context } from 'hono'
 import type { AppEnv, Post } from '../types'
 import * as postService from '../services/postService'
 import { isZodError, zodMessage } from '../utils/zodHelper'
-import { SYSTEM_USER_ADMIN_GROUP_ID, SYSTEM_BBS_ADMIN_GROUP_ID } from '../utils/constants'
-
 function adminVisible(c: Context<AppEnv>): boolean {
-  const groups = c.get('userGroupIds')
-  return groups.includes(SYSTEM_USER_ADMIN_GROUP_ID) || groups.includes(SYSTEM_BBS_ADMIN_GROUP_ID)
+  return c.get('isAdmin') || c.get('isUserAdmin')
 }
 
 function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
@@ -15,13 +12,23 @@ function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'>
   return rest
 }
 
-export async function getPostsHandler(c: Context<AppEnv>): Promise<Response> {
+// GET /boards/:boardId/:threadId/:responseNumber - 特定の投稿を取得
+export async function getPostHandler(c: Context<AppEnv>): Promise<Response> {
+  const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
-  const posts = await postService.getPostsByThreadId(c.env.DB, threadId)
-  const visible = adminVisible(c)
-  return c.json({ data: posts.map(p => stripPost(p, visible)) })
+  const responseNumber = parseInt(c.req.param('responseNumber'), 10)
+  if (isNaN(responseNumber) || responseNumber < 1) {
+    return c.json({ error: 'VALIDATION_ERROR', message: 'responseNumber must be a positive integer' }, 400)
+  }
+  const post = await postService.getPostByNumber(
+    c.env.DB, boardId, threadId, responseNumber,
+    c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+  )
+  if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
+  return c.json({ data: stripPost(post, adminVisible(c)) })
 }
 
+// POST /boards/:boardId/:threadId - 投稿作成
 export async function createPostHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
@@ -48,18 +55,25 @@ export async function createPostHandler(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-export async function deletePostHandler(c: Context<AppEnv>): Promise<Response> {
+// PUT /boards/:boardId/:threadId/:responseNumber - 投稿更新 (ソフト削除含む)
+export async function updatePostHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
-  const postId = c.req.param('postId')
+  const responseNumber = parseInt(c.req.param('responseNumber'), 10)
+  if (isNaN(responseNumber) || responseNumber < 1) {
+    return c.json({ error: 'VALIDATION_ERROR', message: 'responseNumber must be a positive integer' }, 400)
+  }
   try {
-    const deleted = await postService.deletePost(
-      c.env.DB, boardId, threadId, postId,
+    const body = await c.req.json()
+    const input = postService.parseUpdatePost(body)
+    const post = await postService.updatePost(
+      c.env.DB, boardId, threadId, responseNumber, input,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
-    if (!deleted) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    return new Response(null, { status: 204 })
+    if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
+    return c.json({ data: stripPost(post, adminVisible(c)) })
   } catch (e) {
+    if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'FORBIDDEN') {
       return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
     }

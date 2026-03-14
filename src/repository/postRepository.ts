@@ -4,6 +4,9 @@ type PostRow = {
   id: string
   thread_id: string
   post_number: number
+  owner_user_id: string | null
+  owner_group_id: string | null
+  permissions: string
   user_id: string | null
   display_user_id: string
   poster_name: string
@@ -20,6 +23,9 @@ function rowToPost(row: PostRow): Post {
     id: row.id,
     threadId: row.thread_id,
     postNumber: row.post_number,
+    ownerUserId: row.owner_user_id,
+    ownerGroupId: row.owner_group_id,
+    permissions: row.permissions,
     userId: row.user_id,
     displayUserId: row.display_user_id,
     posterName: row.poster_name,
@@ -42,6 +48,18 @@ export async function findPostsByThreadId(db: D1Database, threadId: string): Pro
   return result.results.map(rowToPost)
 }
 
+export async function findPostByNumber(
+  db: D1Database,
+  threadId: string,
+  postNumber: number,
+): Promise<Post | null> {
+  const row = await db
+    .prepare('SELECT * FROM posts WHERE thread_id = ? AND post_number = ?')
+    .bind(threadId, postNumber)
+    .first<PostRow>()
+  return row ? rowToPost(row) : null
+}
+
 // スレッド内の次の post_number を取得
 export async function nextPostNumber(db: D1Database, threadId: string): Promise<number> {
   const row = await db
@@ -55,24 +73,31 @@ export async function insertPost(db: D1Database, post: Post): Promise<void> {
   await db
     .prepare(`
       INSERT INTO posts (
-        id, thread_id, post_number, user_id, display_user_id,
-        poster_name, poster_sub_info, content, created_at,
+        id, thread_id, post_number, owner_user_id, owner_group_id, permissions,
+        user_id, display_user_id, poster_name, poster_sub_info, content, created_at,
         creator_user_id, creator_session_id, creator_turnstile_session_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .bind(
-      post.id, post.threadId, post.postNumber, post.userId,
-      post.displayUserId, post.posterName, post.posterSubInfo,
+      post.id, post.threadId, post.postNumber,
+      post.ownerUserId, post.ownerGroupId, post.permissions,
+      post.userId, post.displayUserId, post.posterName, post.posterSubInfo,
       post.content, post.createdAt,
       post.adminMeta.creatorUserId, post.adminMeta.creatorSessionId, post.adminMeta.creatorTurnstileSessionId,
     )
     .run()
 }
 
-export async function deletePost(db: D1Database, threadId: string, postId: string): Promise<boolean> {
+// 投稿内容の更新 (ソフト削除=削除マークの書き込みにも使用)
+export async function updatePostContent(
+  db: D1Database,
+  threadId: string,
+  postNumber: number,
+  content: string,
+): Promise<boolean> {
   const result = await db
-    .prepare('DELETE FROM posts WHERE id = ? AND thread_id = ?')
-    .bind(postId, threadId)
+    .prepare('UPDATE posts SET content = ? WHERE thread_id = ? AND post_number = ?')
+    .bind(content, threadId, postNumber)
     .run()
   return result.meta.changes > 0
 }

@@ -3,7 +3,7 @@ import type { Post } from '../types'
 import * as postRepository from '../repository/postRepository'
 import * as threadRepository from '../repository/threadRepository'
 import * as boardRepository from '../repository/boardRepository'
-import { hasPermission, PERM } from '../utils/permission'
+import { hasPermission } from '../utils/permission'
 import { computeDisplayUserId } from '../utils/hash'
 
 const createPostSchema = z.object({
@@ -12,14 +12,44 @@ const createPostSchema = z.object({
   posterSubInfo: z.string().max(100).optional(),
 })
 
+// 投稿更新 (ソフト削除含む): content のみ更新可能
+const updatePostSchema = z.object({
+  content: z.string().min(1).max(5000),
+})
+
 export type CreatePostInput = z.infer<typeof createPostSchema>
+export type UpdatePostInput = z.infer<typeof updatePostSchema>
 
 export function parseCreatePost(data: unknown): CreatePostInput {
   return createPostSchema.parse(data)
 }
 
-export async function getPostsByThreadId(db: D1Database, threadId: string): Promise<Post[]> {
-  return postRepository.findPostsByThreadId(db, threadId)
+export function parseUpdatePost(data: unknown): UpdatePostInput {
+  return updatePostSchema.parse(data)
+}
+
+export async function getPostByNumber(
+  db: D1Database,
+  boardId: string,
+  threadId: string,
+  postNumber: number,
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+): Promise<Post | null> {
+  const thread = await threadRepository.findThreadById(db, threadId)
+  if (!thread || thread.boardId !== boardId) return null
+  // スレッド自体に読み取り権限がない場合は存在しないように見せる
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'GET', isAdmin })) {
+    return null
+  }
+  const post = await postRepository.findPostByNumber(db, threadId, postNumber)
+  if (!post) return null
+  // 投稿自体に読み取り権限がない場合は存在しないように見せる
+  if (!isAdmin && !hasPermission({ userId, userGroupIds, ownerUserId: post.ownerUserId, ownerGroupId: post.ownerGroupId, permissions: post.permissions, operation: 'GET', isAdmin })) {
+    return null
+  }
+  return post
 }
 
 export async function createPost(
@@ -39,8 +69,8 @@ export async function createPost(
   const board = await boardRepository.findBoardById(db, boardId)
   if (!board) throw new Error('BOARD_NOT_FOUND')
 
-  // 書き込み権限チェック
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, required: PERM.WRITE, isAdmin })) {
+  // 書き込み権限チェック: スレッドの POST パーミッション
+  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'POST', isAdmin })) {
     throw new Error('FORBIDDEN')
   }
 
@@ -68,6 +98,9 @@ export async function createPost(
     id: crypto.randomUUID(),
     threadId,
     postNumber,
+    ownerUserId: userId,              // 投稿者をオーナーに設定
+    ownerGroupId: thread.ownerGroupId, // スレッドのグループを継承
+    permissions: '10,10,10,8',         // GET: all, PUT: owner+group+auth, それ以外: anon=GETのみ
     userId,
     displayUserId,
     posterName,
@@ -84,21 +117,32 @@ export async function createPost(
   return post
 }
 
-export async function deletePost(
+// 投稿の更新 (ソフト削除=削除マーク書き込みにも使用)
+export async function updatePost(
   db: D1Database,
   boardId: string,
   threadId: string,
-  postId: string,
+  postNumber: number,
+  input: UpdatePostInput,
   userId: string | null,
   userGroupIds: string[],
   isAdmin: boolean,
-): Promise<boolean> {
+): Promise<Post | null> {
   const thread = await threadRepository.findThreadById(db, threadId)
-  if (!thread || thread.boardId !== boardId) return false
+  if (!thread || thread.boardId !== boardId) return null
 
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, required: PERM.DELETE, isAdmin })) {
+  const post = await postRepository.findPostByNumber(db, threadId, postNumber)
+  if (!post) return null
+
+  // PUT パーミッションチェック (post 自身のパーミッションで確認)
+  if (!hasPermission({
+    userId, userGroupIds,
+    ownerUserId: post.ownerUserId, ownerGroupId: post.ownerGroupId,
+    permissions: post.permissions, operation: 'PUT', isAdmin,
+  })) {
     throw new Error('FORBIDDEN')
   }
 
-  return postRepository.deletePost(db, threadId, postId)
+  await postRepository.updatePostContent(db, threadId, postNumber, input.content)
+  return postRepository.findPostByNumber(db, threadId, postNumber)
 }

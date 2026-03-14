@@ -2,35 +2,46 @@ import type { Context } from 'hono'
 import type { AppEnv } from '../types'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import * as identityService from '../services/identityService'
-import { SYSTEM_USER_ADMIN_GROUP_ID } from '../utils/constants'
+import { getSystemIds } from '../utils/constants'
 
-// ユーザ管理権限チェック用ヘルパー
-// isAdmin (bbsAdmin) とは別に、userAdminGroup メンバーかどうかを判定する
-function isUserAdmin(c: Context<AppEnv>): boolean {
-  return c.get('userGroupIds').includes(SYSTEM_USER_ADMIN_GROUP_ID)
+// 環境変数から表示件数上限を取得 (0=無制限)
+function getLimit(envVal: string | undefined): number {
+  const n = parseInt(envVal ?? '0', 10)
+  return isNaN(n) || n < 0 ? 0 : n
 }
 
 // ── ユーザ操作 ────────────────────────────────────────────
 
-// GET /identity/user
+// GET /identity/users?page=<n>
 export async function listUsersHandler(c: Context<AppEnv>): Promise<Response> {
-  const users = await identityService.listUsers(c.env.DB)
-  return c.json({ data: users })
+  const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10))
+  const limit = getLimit(c.env.USER_DISPLAY_LIMIT)
+  const users = await identityService.listUsers(c.env.DB, page, limit)
+  return c.json({ data: users, page, limit })
 }
 
-// GET /identity/user/me
-export async function getMeHandler(c: Context<AppEnv>): Promise<Response> {
-  const userId = c.get('userId')!
-  const user = await identityService.getUser(c.env.DB, userId, userId, true)
-  if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
-  return c.json({ data: user })
+// POST /identity/users (ユーザ作成 - Turnstile 必須)
+export async function createUserHandler(c: Context<AppEnv>): Promise<Response> {
+  const sysIds = getSystemIds(c.env)
+  try {
+    const body = await c.req.json()
+    const input = identityService.parseCreateUser(body)
+    const user = await identityService.createUser(c.env.DB, input, sysIds)
+    return c.json({ data: user }, 201)
+  } catch (e) {
+    if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
+    if (e instanceof Error && e.message === 'USER_ID_TAKEN') {
+      return c.json({ error: 'USER_ID_TAKEN', message: 'This user ID is already taken' }, 409)
+    }
+    throw e
+  }
 }
 
-// GET /identity/user/:id
+// GET /identity/users/:id
 export async function getUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
   try {
-    const user = await identityService.getUser(c.env.DB, targetId, c.get('userId'), isUserAdmin(c))
+    const user = await identityService.getUser(c.env.DB, targetId, c.get('userId'), c.get('isUserAdmin'))
     if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     return c.json({ data: user })
   } catch (e) {
@@ -41,30 +52,31 @@ export async function getUserHandler(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-// PUT /identity/user/:id
+// PUT /identity/users/:id (管理者による任意ユーザ更新: isActive 含む)
 export async function updateUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
   try {
     const body = await c.req.json()
-    const input = identityService.parseUpdateUser(body)
-    const user = await identityService.updateUser(c.env.DB, targetId, input, c.get('userId'), isUserAdmin(c))
+    const input = identityService.parseUpdateUserAdmin(body)
+    const user = await identityService.updateUser(c.env.DB, targetId, input, c.get('userId'), c.get('isUserAdmin'))
     if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     return c.json({ data: user })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error) {
       if (e.message === 'FORBIDDEN') return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
-      if (e.message === 'USERNAME_TAKEN') return c.json({ error: 'USERNAME_TAKEN', message: 'Username is already taken' }, 409)
+      if (e.message === 'USER_NOT_FOUND') return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     }
     throw e
   }
 }
 
-// DELETE /identity/user/:id
+// DELETE /identity/users/:id (userAdminGroup 専用)
 export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
+  const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteUser(c.env.DB, targetId)
+    await identityService.deleteUser(c.env.DB, targetId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
@@ -75,33 +87,17 @@ export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-// PUT /identity/user/:id/password
-export async function changePasswordHandler(c: Context<AppEnv>): Promise<Response> {
-  const userId = c.get('userId')!
-  try {
-    const body = await c.req.json()
-    const input = identityService.parseChangePassword(body)
-    await identityService.changePassword(c.env.DB, userId, input)
-    return new Response(null, { status: 204 })
-  } catch (e) {
-    if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
-    if (e instanceof Error) {
-      if (e.message === 'USER_NOT_FOUND') return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
-      if (e.message === 'INVALID_PASSWORD') return c.json({ error: 'INVALID_PASSWORD', message: 'Current password is incorrect' }, 400)
-    }
-    throw e
-  }
-}
-
 // ── グループ操作 ──────────────────────────────────────────
 
-// GET /identity/group
+// GET /identity/groups?page=<n>
 export async function listGroupsHandler(c: Context<AppEnv>): Promise<Response> {
-  const groups = await identityService.listGroups(c.env.DB)
-  return c.json({ data: groups })
+  const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10))
+  const limit = getLimit(c.env.GROUP_DISPLAY_LIMIT)
+  const groups = await identityService.listGroups(c.env.DB, page, limit)
+  return c.json({ data: groups, page, limit })
 }
 
-// GET /identity/group/:id
+// GET /identity/groups/:id
 export async function getGroupHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
   const group = await identityService.getGroup(c.env.DB, groupId)
@@ -109,7 +105,7 @@ export async function getGroupHandler(c: Context<AppEnv>): Promise<Response> {
   return c.json({ data: group })
 }
 
-// POST /identity/group
+// POST /identity/groups
 export async function createGroupHandler(c: Context<AppEnv>): Promise<Response> {
   try {
     const body = await c.req.json()
@@ -125,13 +121,14 @@ export async function createGroupHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
-// PUT /identity/group/:id
+// PUT /identity/groups/:id
 export async function updateGroupHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
+  const sysIds = getSystemIds(c.env)
   try {
     const body = await c.req.json()
     const input = identityService.parseGroup(body)
-    const group = await identityService.updateGroup(c.env.DB, groupId, input)
+    const group = await identityService.updateGroup(c.env.DB, groupId, input, sysIds)
     if (!group) return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
     return c.json({ data: group })
   } catch (e) {
@@ -144,11 +141,12 @@ export async function updateGroupHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
-// DELETE /identity/group/:id
+// DELETE /identity/groups/:id
 export async function deleteGroupHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
+  const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteGroup(c.env.DB, groupId)
+    await identityService.deleteGroup(c.env.DB, groupId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
@@ -159,7 +157,7 @@ export async function deleteGroupHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
-// POST /identity/group/:id/members
+// POST /identity/groups/:id/members
 export async function addGroupMemberHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
   const body = await c.req.json<{ userId?: string }>()
@@ -178,7 +176,7 @@ export async function addGroupMemberHandler(c: Context<AppEnv>): Promise<Respons
   }
 }
 
-// DELETE /identity/group/:id/members/:userId
+// DELETE /identity/groups/:id/members/:userId
 export async function removeGroupMemberHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
   const userId = c.req.param('userId')

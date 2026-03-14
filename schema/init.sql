@@ -4,6 +4,7 @@
 DROP TABLE IF EXISTS posts;
 DROP TABLE IF EXISTS threads;
 DROP TABLE IF EXISTS boards;
+DROP TABLE IF EXISTS bbs_root;
 DROP TABLE IF EXISTS user_groups;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS groups;
@@ -17,11 +18,15 @@ CREATE TABLE groups (
 );
 
 CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  username TEXT NOT NULL UNIQUE,
+  id TEXT PRIMARY KEY,                          -- ログインID兼表示ID (英数字・ハイフン・アンダーバー、7-128文字、変更不可)
+  display_name TEXT NOT NULL DEFAULT '',        -- 表示名 (日本語可、0-128文字)
+  bio TEXT,                                     -- 自己紹介 (省略可)
+  email TEXT,                                   -- メールアドレス (省略可)
+  is_active INTEGER NOT NULL DEFAULT 1,         -- アカウント有効フラグ (0=無効、管理者のみ変更可)
   password_hash TEXT NOT NULL,
   primary_group_id TEXT,
   created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   FOREIGN KEY (primary_group_id) REFERENCES groups(id)
 );
 
@@ -33,11 +38,14 @@ CREATE TABLE user_groups (
   FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
 );
 
+-- permissions 形式: "owner,group,auth,anon"
+-- 各値は操作ビットマスク: DELETE=1, PUT=2, POST=4, GET=8 (例: 15=全操作, 8=GETのみ)
 CREATE TABLE boards (
   id TEXT PRIMARY KEY,
   owner_user_id TEXT,
   owner_group_id TEXT,
-  permissions TEXT NOT NULL DEFAULT '15,12,12',
+  permissions TEXT NOT NULL DEFAULT '15,14,12,12',
+  -- owner: 全操作, group: GET+POST+PUT, auth: GET+POST, anon: GET+POST
   name TEXT NOT NULL,
   description TEXT,
   max_threads INTEGER NOT NULL DEFAULT 1000,
@@ -52,7 +60,7 @@ CREATE TABLE boards (
   default_id_format TEXT NOT NULL DEFAULT 'daily_hash',
   default_thread_owner_user_id TEXT,
   default_thread_owner_group_id TEXT,
-  default_thread_permissions TEXT NOT NULL DEFAULT '15,12,12',
+  default_thread_permissions TEXT NOT NULL DEFAULT '15,14,12,12',
   created_at TEXT NOT NULL,
   creator_user_id TEXT,
   creator_session_id TEXT,
@@ -66,7 +74,7 @@ CREATE TABLE threads (
   board_id TEXT NOT NULL,
   owner_user_id TEXT,
   owner_group_id TEXT,
-  permissions TEXT NOT NULL DEFAULT '15,12,12',
+  permissions TEXT NOT NULL DEFAULT '15,14,12,12',
   title TEXT NOT NULL,
   max_posts INTEGER,
   max_post_length INTEGER,
@@ -91,7 +99,11 @@ CREATE TABLE posts (
   id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL,
   post_number INTEGER NOT NULL,
-  user_id TEXT,
+  owner_user_id TEXT,                           -- 投稿者ユーザID (匿名の場合 NULL)
+  owner_group_id TEXT,                          -- スレッドの ownerGroupId を継承
+  permissions TEXT NOT NULL DEFAULT '10,10,10,8',
+  -- owner: GET+PUT, group: GET+PUT, auth: GET+PUT, anon: GETのみ
+  user_id TEXT,                                 -- ログイン中ユーザID (adminMeta 用)
   display_user_id TEXT NOT NULL DEFAULT '',
   poster_name TEXT NOT NULL,
   poster_sub_info TEXT,
@@ -104,20 +116,23 @@ CREATE TABLE posts (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- システムグループ (固定ID)
+-- システムグループ
+-- ADMIN_USERNAME 環境変数でカスタマイズ可能 (デフォルト: admin)
+-- USER_ADMIN_GROUP / BBS_ADMIN_GROUP 環境変数でカスタマイズ可能
 INSERT INTO groups (id, name, created_at) VALUES
-  ('sys-user-admin-group', 'userAdminGroup', '2024-01-01T00:00:00.000Z'),
-  ('sys-bbs-admin-group',  'bbsAdminGroup',  '2024-01-01T00:00:00.000Z'),
-  ('sys-admin-group',      'admin',          '2024-01-01T00:00:00.000Z'),
-  ('sys-general-group',    'general',        '2024-01-01T00:00:00.000Z');
+  ('user-admin-group', 'userAdminGroup', '2024-01-01T00:00:00.000Z'),
+  ('bbs-admin-group',  'bbsAdminGroup',  '2024-01-01T00:00:00.000Z'),
+  ('admin-group',      'adminGroup',     '2024-01-01T00:00:00.000Z'),
+  ('general-group',    'general',        '2024-01-01T00:00:00.000Z');
 
 -- admin ユーザー (パスワードは POST /auth/setup で設定)
-INSERT INTO users (id, username, password_hash, primary_group_id, created_at) VALUES
-  ('sys-admin', 'admin', '__NEEDS_SETUP__', 'sys-admin-group', '2024-01-01T00:00:00.000Z');
+-- ADMIN_USERNAME 環境変数でカスタマイズする場合はこの ID も変更すること
+INSERT INTO users (id, display_name, bio, email, is_active, password_hash, primary_group_id, created_at, updated_at) VALUES
+  ('admin', 'admin', NULL, NULL, 1, '__NEEDS_SETUP__', 'admin-group', '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z');
 
 -- admin を全システムグループに追加
 INSERT INTO user_groups (user_id, group_id) VALUES
-  ('sys-admin', 'sys-admin-group'),
-  ('sys-admin', 'sys-user-admin-group'),
-  ('sys-admin', 'sys-bbs-admin-group'),
-  ('sys-admin', 'sys-general-group');
+  ('admin', 'admin-group'),
+  ('admin', 'user-admin-group'),
+  ('admin', 'bbs-admin-group'),
+  ('admin', 'general-group');

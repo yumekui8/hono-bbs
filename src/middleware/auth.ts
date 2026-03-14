@@ -3,21 +3,22 @@ import type { AppEnv } from '../types'
 import * as sessionRepository from '../repository/sessionRepository'
 import * as groupRepository from '../repository/groupRepository'
 import * as userRepository from '../repository/userRepository'
-import { SYSTEM_BBS_ADMIN_GROUP_ID, SYSTEM_USER_ADMIN_GROUP_ID } from '../utils/constants'
+import { getSystemIds } from '../utils/constants'
 
 // 全ルートに適用: セッション・管理者フラグ・userToken をコンテキストに設定する
 // 認証失敗でもブロックしない (権限チェックは各サービスで行う)
 export const authContext: MiddlewareHandler<AppEnv> = async (c, next) => {
-  // セッションチェック
+  const sysIds = getSystemIds(c.env)
   const sessionId = c.req.header('X-Session-Id')
+
   if (sessionId) {
     const session = await sessionRepository.findSessionById(c.env.SESSION_KV, sessionId)
     if (session) {
       c.set('userId', session.userId)
       const groupIds = await groupRepository.findGroupIdsByUserId(c.env.DB, session.userId)
       c.set('userGroupIds', groupIds)
-      // sys-bbs-admin-group メンバーなら掲示板管理者とみなす (板/スレッド/投稿の権限チェックで使用)
-      c.set('isAdmin', groupIds.includes(SYSTEM_BBS_ADMIN_GROUP_ID))
+      c.set('isAdmin',     groupIds.includes(sysIds.bbsAdminGroupId))
+      c.set('isUserAdmin', groupIds.includes(sysIds.userAdminGroupId))
       const user = await userRepository.findUserById(c.env.DB, session.userId)
       c.set('primaryGroupId', user?.primaryGroupId ?? null)
       await next()
@@ -28,6 +29,7 @@ export const authContext: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('userId', null)
   c.set('userGroupIds', [])
   c.set('isAdmin', false)
+  c.set('isUserAdmin', false)
   c.set('primaryGroupId', null)
   await next()
 }
@@ -50,7 +52,7 @@ export const requireBbsAdminGroup: MiddlewareHandler<AppEnv> = async (c, next) =
 
 // userAdminGroup メンバー必須 (ユーザ管理操作, requireLogin と併用)
 export const requireUserAdminGroup: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (!c.get('userGroupIds').includes(SYSTEM_USER_ADMIN_GROUP_ID)) {
+  if (!c.get('isUserAdmin')) {
     return c.json({ error: 'FORBIDDEN', message: 'Requires userAdminGroup membership' }, 403)
   }
   await next()

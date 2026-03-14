@@ -11,7 +11,42 @@ TURNSTILE_SECRET_KEY=your-turnstile-secret-key-here
 DISABLE_TURNSTILE=true
 
 # admin ユーザーの初期パスワード (POST /auth/setup で使用)
-ADMIN_INITIAL_PASSWORD=your-admin-initial-password-here
+ADMIN_INITIAL_PASSWORD=password
+
+# 管理者ユーザID (デフォルト: admin)
+# 変更する場合は init.sql の INSERT 文も合わせて変更すること
+# ADMIN_USERNAME=admin
+
+# ユーザ管理グループID (デフォルト: user-admin-group)
+# 変更する場合は init.sql の INSERT 文も合わせて変更すること
+# USER_ADMIN_GROUP=user-admin-group
+
+# 掲示板管理グループID (デフォルト: bbs-admin-group)
+# 変更する場合は init.sql の INSERT 文も合わせて変更すること
+# BBS_ADMIN_GROUP=bbs-admin-group
+
+# エンドポイント権限設定 (JSON形式、省略時はデフォルト値を使用)
+# 例: /boards への POST を auth ユーザーにも許可する場合:
+# ENDPOINT_PERMISSIONS={"\/boards":{"ownerUserId":"$SYS_ADMIN","ownerGroupId":"$BBS_ADMIN_GROUP","permissions":"15,15,12,12"}}
+
+# リクエストサイズ上限 (例: "1mb", "500kb", 省略時は無制限)
+# MAX_REQUEST_SIZE=1mb
 
 # APIベースパス (wrangler.jsonc の vars.API_BASE_PATH を上書き可)
 # API_BASE_PATH=/api/v1
+
+# 許可する CORS オリジン (カンマ区切りで複数指定可)
+# 本番環境は wrangler secret put CORS_ORIGIN で設定することを推奨
+CORS_ORIGIN=http://localhost:5173
+
+# 許可するドメイン (カンマ区切りで複数指定可、未設定時は制限なし)
+# BBS_ALLOW_DOMAIN=localhost:8787,example.com
+
+# Turnstile認証後にリダイレクトを許可するUIドメイン (カンマ区切り、未設定時はリダイレクトなし)
+# ALLOW_BBS_UI_DOMAINS=localhost:5173,bbs.example.com
+
+# ユーザ一覧ページネーション件数 (0=無制限)
+# USER_DISPLAY_LIMIT=0
+
+# グループ一覧ページネーション件数 (0=無制限)
+# GROUP_DISPLAY_LIMIT=0

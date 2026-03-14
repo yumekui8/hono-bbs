@@ -2,11 +2,8 @@ import type { Context } from 'hono'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import type { AppEnv, Thread, Post } from '../types'
 import * as threadService from '../services/threadService'
-import { SYSTEM_USER_ADMIN_GROUP_ID, SYSTEM_BBS_ADMIN_GROUP_ID } from '../utils/constants'
-
 function adminVisible(c: Context<AppEnv>): boolean {
-  const groups = c.get('userGroupIds')
-  return groups.includes(SYSTEM_USER_ADMIN_GROUP_ID) || groups.includes(SYSTEM_BBS_ADMIN_GROUP_ID)
+  return c.get('isAdmin') || c.get('isUserAdmin')
 }
 
 function stripThread(thread: Thread, visible: boolean): Thread | Omit<Thread, 'adminMeta'> {
@@ -21,9 +18,12 @@ function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'>
   return rest
 }
 
+// GET /boards/:boardId - 板情報 + スレッド一覧
 export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
-  const result = await threadService.getThreadsWithBoard(c.env.DB, boardId)
+  const result = await threadService.getThreadsWithBoard(
+    c.env.DB, boardId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+  )
   if (!result) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
   const visible = adminVisible(c)
   return c.json({
@@ -34,10 +34,13 @@ export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   })
 }
 
+// GET /boards/:boardId/:threadId - スレッド情報 + 投稿一覧
 export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
-  const result = await threadService.getThreadWithPosts(c.env.DB, boardId, threadId)
+  const result = await threadService.getThreadWithPosts(
+    c.env.DB, boardId, threadId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+  )
   if (!result) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
   const visible = adminVisible(c)
   return c.json({
@@ -48,6 +51,7 @@ export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Res
   })
 }
 
+// POST /boards/:boardId - スレッド作成 (第1レス同時作成)
 export async function createThreadHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   try {
@@ -82,6 +86,7 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
   }
 }
 
+// PUT /boards/:boardId/:threadId - スレッド情報更新
 export async function updateThreadHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
@@ -103,6 +108,7 @@ export async function updateThreadHandler(c: Context<AppEnv>): Promise<Response>
   }
 }
 
+// DELETE /boards/:boardId/:threadId - スレッド削除
 export async function deleteThreadHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')

@@ -7,10 +7,14 @@ export type IdFormat =
   | 'none'                 // 表示なし
 
 export type User = {
-  id: string
-  username: string
+  id: string              // ログインID兼表示ID (変更不可)
+  displayName: string     // 表示名 (日本語可)
+  bio: string | null      // 自己紹介
+  email: string | null    // メールアドレス
+  isActive: boolean       // アカウント有効フラグ (管理者のみ変更可)
   primaryGroupId: string | null
   createdAt: string
+  updatedAt: string
 }
 
 export type Group = {
@@ -22,6 +26,7 @@ export type Group = {
 export type Session = {
   id: string
   userId: string
+  isActive: boolean       // セッション有効フラグ (false で無効化済み)
   createdAt: string
   expiresAt: string
 }
@@ -43,7 +48,7 @@ export type Board = {
   id: string
   ownerUserId: string | null
   ownerGroupId: string | null
-  permissions: string           // "15,12,8"
+  permissions: string           // "owner,group,auth,anon" 各値は操作ビットマスク
   name: string
   description: string | null
   maxThreads: number
@@ -89,7 +94,10 @@ export type Post = {
   id: string
   threadId: string
   postNumber: number
-  userId: string | null
+  ownerUserId: string | null    // 投稿者ユーザID (匿名の場合 NULL)
+  ownerGroupId: string | null   // スレッドの ownerGroupId を継承
+  permissions: string           // "owner,group,auth,anon" 各値は操作ビットマスク
+  userId: string | null         // ログイン中ユーザID (adminMeta 用)
   displayUserId: string
   posterName: string
   posterSubInfo: string | null
@@ -106,11 +114,22 @@ export type AppEnv = {
     TURNSTILE_SECRET_KEY: string | undefined
     DISABLE_TURNSTILE: string | undefined   // 'true' でスキップ (ローカル開発用)
     ADMIN_INITIAL_PASSWORD: string | undefined  // POST /auth/setup で使用
+    ADMIN_USERNAME: string | undefined      // 管理者ユーザID (デフォルト: admin)
+    USER_ADMIN_GROUP: string | undefined    // ユーザ管理グループID (デフォルト: user-admin-group)
+    BBS_ADMIN_GROUP: string | undefined     // 掲示板管理グループID (デフォルト: bbs-admin-group)
+    ENDPOINT_PERMISSIONS: string | undefined // エンドポイント権限JSON (省略時はデフォルト値を使用)
+    MAX_REQUEST_SIZE: string | undefined    // リクエストサイズ上限 例: "1mb", "500kb"
     API_BASE_PATH: string      // e.g. "/api/v1"
+    CORS_ORIGIN: string | undefined  // 許可するオリジン カンマ区切り
+    BBS_ALLOW_DOMAIN: string | undefined      // 許可するドメイン カンマ区切り (未設定時は制限なし)
+    ALLOW_BBS_UI_DOMAINS: string | undefined  // Turnstile認証後のリダイレクト許可UIドメイン
+    USER_DISPLAY_LIMIT: string | undefined  // ユーザ一覧ページネーション件数 (0=無制限)
+    GROUP_DISPLAY_LIMIT: string | undefined // グループ一覧ページネーション件数 (0=無制限)
   }
   Variables: {
     userId: string | null           // セッションから取得したユーザID
-    isAdmin: boolean                // sys-user-admin-group メンバーかどうか
+    isAdmin: boolean                // bbsAdminGroup メンバーかどうか
+    isUserAdmin: boolean            // userAdminGroup メンバーかどうか
     userGroupIds: string[]          // ユーザが所属するグループID一覧
     primaryGroupId: string | null   // ユーザのプライマリグループID
   }

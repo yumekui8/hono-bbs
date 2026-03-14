@@ -101,6 +101,9 @@ export async function updateBoard(
   updates: {
     name?: string
     description?: string | null
+    ownerUserId?: string | null
+    ownerGroupId?: string | null
+    permissions?: string
     maxThreads?: number
     defaultMaxPosts?: number
     defaultMaxPostLength?: number
@@ -113,6 +116,9 @@ export async function updateBoard(
 
   if (updates.name !== undefined)                 { fields.push('name = ?');                    values.push(updates.name) }
   if ('description' in updates)                   { fields.push('description = ?');             values.push(updates.description ?? null) }
+  if ('ownerUserId' in updates)                   { fields.push('owner_user_id = ?');           values.push(updates.ownerUserId ?? null) }
+  if ('ownerGroupId' in updates)                  { fields.push('owner_group_id = ?');          values.push(updates.ownerGroupId ?? null) }
+  if (updates.permissions !== undefined)          { fields.push('permissions = ?');             values.push(updates.permissions) }
   if (updates.maxThreads !== undefined)           { fields.push('max_threads = ?');             values.push(updates.maxThreads) }
   if (updates.defaultMaxPosts !== undefined)      { fields.push('default_max_posts = ?');       values.push(updates.defaultMaxPosts) }
   if (updates.defaultMaxPostLength !== undefined) { fields.push('default_max_post_length = ?'); values.push(updates.defaultMaxPostLength) }

@@ -1,29 +1,21 @@
-import type { Group, User } from '../types'
+import type { Group } from '../types'
 
 type GroupRow = { id: string; name: string; created_at: string }
-
-type UserRow = {
-  id: string
-  username: string
-  password_hash: string
-  primary_group_id: string | null
-  created_at: string
-}
 
 function rowToGroup(row: GroupRow): Group {
   return { id: row.id, name: row.name, createdAt: row.created_at }
 }
 
-function rowToUser(row: UserRow): User {
-  return {
-    id: row.id,
-    username: row.username,
-    primaryGroupId: row.primary_group_id,
-    createdAt: row.created_at,
+// page: 1始まり、limit: 0なら全件
+export async function listGroups(db: D1Database, page = 1, limit = 0): Promise<Group[]> {
+  if (limit > 0) {
+    const offset = (page - 1) * limit
+    const result = await db
+      .prepare('SELECT * FROM groups ORDER BY created_at ASC LIMIT ? OFFSET ?')
+      .bind(limit, offset)
+      .all<GroupRow>()
+    return result.results.map(rowToGroup)
   }
-}
-
-export async function listGroups(db: D1Database): Promise<Group[]> {
   const result = await db.prepare('SELECT * FROM groups ORDER BY created_at ASC').all<GroupRow>()
   return result.results.map(rowToGroup)
 }
@@ -54,16 +46,6 @@ export async function findGroupIdsByUserId(db: D1Database, userId: string): Prom
     .bind(userId)
     .all<{ group_id: string }>()
   return result.results.map((r) => r.group_id)
-}
-
-export async function listGroupMembers(db: D1Database, groupId: string): Promise<User[]> {
-  const result = await db
-    .prepare(
-      'SELECT u.* FROM users u INNER JOIN user_groups ug ON u.id = ug.user_id WHERE ug.group_id = ?',
-    )
-    .bind(groupId)
-    .all<UserRow>()
-  return result.results.map(rowToUser)
 }
 
 export async function insertGroup(db: D1Database, group: Group): Promise<void> {
