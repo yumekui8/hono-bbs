@@ -64,6 +64,7 @@ export type Board = {
   defaultThreadOwnerUserId: string | null
   defaultThreadOwnerGroupId: string | null
   defaultThreadPermissions: string
+  category: string | null              // カテゴリ / タグ (省略可)
   createdAt: string
   adminMeta: AdminMeta
 }
@@ -119,6 +120,7 @@ export type AppEnv = {
     BBS_ADMIN_GROUP: string | undefined     // 掲示板管理グループID (デフォルト: bbs-admin-group)
     ENDPOINT_PERMISSIONS: string | undefined // エンドポイント権限JSON (省略時はデフォルト値を使用)
     MAX_REQUEST_SIZE: string | undefined    // リクエストサイズ上限 例: "1mb", "500kb"
+    TURNSTILE_TOKEN_TTL: string | undefined // Turnstile セッション有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
     API_BASE_PATH: string      // e.g. "/api/v1"
     CORS_ORIGIN: string | undefined  // 許可するオリジン カンマ区切り
     BBS_ALLOW_DOMAIN: string | undefined      // 許可するドメイン カンマ区切り (未設定時は制限なし)

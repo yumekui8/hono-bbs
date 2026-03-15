@@ -39,7 +39,7 @@
     "createdAt":     { "type": "string", "format": "date-time" },
     "adminMeta": {
       "type": "object",
-      "description": "sys-user-admin-group または sys-bbs-admin-group メンバーのみ付与",
+      "description": "user-admin-group または bbs-admin-group メンバーのみ付与",
       "properties": {
         "creatorUserId":             { "type": ["string", "null"] },
         "creatorSessionId":          { "type": ["string", "null"] },

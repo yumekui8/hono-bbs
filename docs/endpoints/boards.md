@@ -46,6 +46,7 @@
     "defaultThreadOwnerUserId":   { "type": ["string", "null"] },
     "defaultThreadOwnerGroupId":  { "type": ["string", "null"] },
     "defaultThreadPermissions":   { "type": "string" },
+    "category":                   { "type": ["string", "null"], "description": "カテゴリ / タグ。省略可、最大128文字" },
     "createdAt":                  { "type": "string", "format": "date-time" },
     "adminMeta": {
       "type": "object",
@@ -133,7 +134,8 @@
     "defaultIdFormat":             { "type": "string", "default": "daily_hash" },
     "defaultThreadOwnerUserId":    { "type": ["string", "null"] },
     "defaultThreadOwnerGroupId":   { "type": ["string", "null"] },
-    "defaultThreadPermissions":    { "type": "string", "default": "15,14,12,12" }
+    "defaultThreadPermissions":    { "type": "string", "default": "15,14,12,12" },
+    "category":                    { "type": "string", "maxLength": 128, "description": "カテゴリ / タグ (省略可)" }
   }
 }
 ```
@@ -176,7 +178,8 @@
     "defaultMaxPosts":      { "type": "integer", "minimum": 1 },
     "defaultMaxPostLength": { "type": "integer", "minimum": 1 },
     "defaultPosterName":    { "type": "string", "maxLength": 50 },
-    "defaultIdFormat":      { "type": "string" }
+    "defaultIdFormat":      { "type": "string" },
+    "category":             { "type": ["string", "null"], "maxLength": 128, "description": "カテゴリ / タグ。null で削除" }
   }
 }
 ```

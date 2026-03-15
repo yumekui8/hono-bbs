@@ -29,10 +29,21 @@ export async function getLogoutInfoHandler(c: Context<AppEnv>): Promise<Response
   return c.json({ data: config })
 }
 
+// TURNSTILE_TOKEN_TTL (分) を解析し、人間が読みやすい文字列を返す
+function parseTurnstileTtl(raw: string | undefined): { minutes: number; label: string } {
+  const minutes = Math.max(0, parseInt(raw ?? '525600', 10) || 525600)
+  if (minutes === 0) return { minutes, label: '有効期限なし' }
+  if (minutes < 60) return { minutes, label: `${minutes} 分` }
+  if (minutes < 60 * 24) return { minutes, label: `${Math.round(minutes / 60)} 時間` }
+  if (minutes < 60 * 24 * 365) return { minutes, label: `${Math.round(minutes / (60 * 24))} 日` }
+  return { minutes, label: `${Math.round(minutes / (60 * 24 * 365))} 年` }
+}
+
 // GET /auth/turnstile - Turnstile ウィジェット HTML ページ
 export async function turnstilePageHandler(c: Context<AppEnv>): Promise<Response> {
   const siteKey = c.env.TURNSTILE_SITE_KEY ?? ''
   const apiBase = c.env.API_BASE_PATH ?? '/api/v1'
+  const { label: ttlLabel } = parseTurnstileTtl(c.env.TURNSTILE_TOKEN_TTL)
 
   // Referer が ALLOW_BBS_UI_DOMAINS に含まれていればリダイレクト先として使用する
   const referer = c.req.header('Referer') ?? ''
@@ -90,7 +101,7 @@ export async function turnstilePageHandler(c: Context<AppEnv>): Promise<Response
     <code id="session-id"></code>
     <br>
     <button id="copy-btn" onclick="copyId()">コピー</button>
-    <p class="hint">このセッションIDは 24 時間有効です。</p>
+    <p class="hint">このセッションIDの有効期限: ${ttlLabel}</p>
   </div>
   <script>
     const redirectTo = ${redirectToJs};
@@ -126,8 +137,13 @@ export async function turnstilePageHandler(c: Context<AppEnv>): Promise<Response
               '<span class="error">セッションの作成に失敗しました。管理者に問い合わせてください。</span>';
           } else {
             const codes = (data.errorCodes || []).join(', ') || data.error || 'unknown';
-            document.getElementById('status').innerHTML =
-              '<span class="error">検証に失敗しました: ' + codes + '</span>';
+            // innerHTML を避け XSS を防ぐ
+            const span = document.createElement('span');
+            span.className = 'error';
+            span.textContent = '検証に失敗しました: ' + codes;
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = '';
+            statusEl.appendChild(span);
           }
           submitted = false;
         }
@@ -167,8 +183,9 @@ export async function turnstileVerifyHandler(c: Context<AppEnv>): Promise<Respon
     ?? 'unknown'
   const userAgent = c.req.header('User-Agent') ?? 'unknown'
 
+  const { minutes: ttlMinutes } = parseTurnstileTtl(c.env.TURNSTILE_TOKEN_TTL)
   const result = await authService.issueTurnstileSession(
-    c.env.SESSION_KV, body.token, c.env.TURNSTILE_SECRET_KEY, clientIP, userAgent,
+    c.env.SESSION_KV, body.token, c.env.TURNSTILE_SECRET_KEY, clientIP, userAgent, ttlMinutes,
   )
   if (!result.sessionId) {
     if (result.errorCodes?.includes('kv-write-failed')) {

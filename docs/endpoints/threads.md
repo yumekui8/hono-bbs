@@ -17,7 +17,7 @@
 また、板自体に GET 権限がない場合は `404` を返す。
 
 スレッドは板の `defaultThreadPermissions` および `defaultThreadOwnerGroupId` を引き継ぐ。
-第1レスの権限は `"15,0,14,0"` (GET: 全員, POST: 不可, PUT: owner+group+auth, DELETE: 不可) が設定される。
+第1レスの権限は `"10,10,10,8"` (owner/group/auth: GET+PUT, anon: GET のみ) が設定される。
 
 ### Thread スキーマ
 
@@ -47,7 +47,7 @@
     "updatedAt":  { "type": "string", "format": "date-time" },
     "adminMeta": {
       "type": "object",
-      "description": "sys-user-admin-group または sys-bbs-admin-group メンバーのみ付与",
+      "description": "user-admin-group または bbs-admin-group メンバーのみ付与",
       "properties": {
         "creatorUserId":             { "type": ["string", "null"] },
         "creatorSessionId":          { "type": ["string", "null"] },

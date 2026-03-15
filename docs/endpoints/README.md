@@ -113,6 +113,7 @@
 | `TURNSTILE_SITE_KEY` | Cloudflare Turnstile サイトキー | — |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile シークレットキー | — |
 | `DISABLE_TURNSTILE` | `true` で検証をスキップ (開発用) | `false` |
+| `TURNSTILE_TOKEN_TTL` | Turnstile セッション有効期限 (分単位, `0` で無期限) | `525600` (1年) |
 | `ADMIN_INITIAL_PASSWORD` | `POST /auth/setup` で使用する初期パスワード | — |
 | `ADMIN_USERNAME` | 管理者ユーザID | `admin` |
 | `USER_ADMIN_GROUP` | ユーザ管理グループID | `user-admin-group` |

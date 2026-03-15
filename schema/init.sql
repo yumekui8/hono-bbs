@@ -61,6 +61,7 @@ CREATE TABLE boards (
   default_thread_owner_user_id TEXT,
   default_thread_owner_group_id TEXT,
   default_thread_permissions TEXT NOT NULL DEFAULT '15,14,12,12',
+  category TEXT,                                -- カテゴリ / タグ (省略可, 最大128文字)
   created_at TEXT NOT NULL,
   creator_user_id TEXT,
   creator_session_id TEXT,

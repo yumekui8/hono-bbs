@@ -20,6 +20,7 @@ type BoardRow = {
   default_thread_owner_user_id: string | null
   default_thread_owner_group_id: string | null
   default_thread_permissions: string
+  category: string | null
   created_at: string
   creator_user_id: string | null
   creator_session_id: string | null
@@ -47,6 +48,7 @@ function rowToBoard(row: BoardRow): Board {
     defaultThreadOwnerUserId: row.default_thread_owner_user_id,
     defaultThreadOwnerGroupId: row.default_thread_owner_group_id,
     defaultThreadPermissions: row.default_thread_permissions,
+    category: row.category,
     createdAt: row.created_at,
     adminMeta: {
       creatorUserId: row.creator_user_id,
@@ -78,8 +80,8 @@ export async function insertBoard(db: D1Database, board: Board): Promise<void> {
         default_max_poster_name_length, default_max_poster_sub_info_length, default_max_poster_meta_info_length,
         default_poster_name, default_id_format,
         default_thread_owner_user_id, default_thread_owner_group_id, default_thread_permissions,
-        created_at, creator_user_id, creator_session_id, creator_turnstile_session_id
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        category, created_at, creator_user_id, creator_session_id, creator_turnstile_session_id
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `)
     .bind(
       board.id, board.ownerUserId, board.ownerGroupId, board.permissions,
@@ -89,6 +91,7 @@ export async function insertBoard(db: D1Database, board: Board): Promise<void> {
       board.defaultMaxPosterNameLength, board.defaultMaxPosterSubInfoLength, board.defaultMaxPosterMetaInfoLength,
       board.defaultPosterName, board.defaultIdFormat,
       board.defaultThreadOwnerUserId, board.defaultThreadOwnerGroupId, board.defaultThreadPermissions,
+      board.category,
       board.createdAt,
       board.adminMeta.creatorUserId, board.adminMeta.creatorSessionId, board.adminMeta.creatorTurnstileSessionId,
     )
@@ -109,6 +112,7 @@ export async function updateBoard(
     defaultMaxPostLength?: number
     defaultPosterName?: string
     defaultIdFormat?: string
+    category?: string | null
   },
 ): Promise<boolean> {
   const fields: string[] = []
@@ -124,6 +128,7 @@ export async function updateBoard(
   if (updates.defaultMaxPostLength !== undefined) { fields.push('default_max_post_length = ?'); values.push(updates.defaultMaxPostLength) }
   if (updates.defaultPosterName !== undefined)    { fields.push('default_poster_name = ?');     values.push(updates.defaultPosterName) }
   if (updates.defaultIdFormat !== undefined)      { fields.push('default_id_format = ?');       values.push(updates.defaultIdFormat) }
+  if ('category' in updates)                      { fields.push('category = ?');                values.push(updates.category ?? null) }
 
   if (fields.length === 0) return true
   values.push(id)

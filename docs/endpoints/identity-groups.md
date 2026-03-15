@@ -5,18 +5,18 @@
 ## 概要
 
 グループの一覧取得・個別取得・作成・更新・削除、およびメンバー管理を行う。
-参照はログイン済みユーザが可能。管理操作は `sys-user-admin-group` メンバーのみ可能。
+参照はログイン済みユーザが可能。管理操作は `user-admin-group` メンバーのみ可能 (`USER_ADMIN_GROUP` 環境変数で変更可能)。
 
 ### 役割・実装の説明
 
 グループはユーザをまとめる単位で、Board/Thread/Post の `ownerGroupId` に使用される。
-`sys-` プレフィックスを持つシステムグループは変更・削除不可。
+システムグループは変更・削除不可。保護対象は `USER_ADMIN_GROUP`・`BBS_ADMIN_GROUP` の値に依存する。
 
-システムグループ一覧:
-- `sys-user-admin-group` — ユーザ・グループ管理権限
-- `sys-bbs-admin-group` — 掲示板管理権限・`adminMeta` 参照権限
-- `sys-admin-group` — `sys-admin` ユーザのプライマリグループ
-- `sys-general-group` — 新規ユーザのデフォルトプライマリグループ
+デフォルトのシステムグループ一覧:
+- `user-admin-group` — ユーザ・グループ管理権限
+- `bbs-admin-group` — 掲示板管理権限・`adminMeta` 参照権限
+- `admin-group` — `admin` ユーザのプライマリグループ
+- `general-group` — 新規ユーザのデフォルトプライマリグループ
 
 ### Group スキーマ
 
@@ -102,7 +102,7 @@
 
 - `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `sys-user-admin-group` メンバーのみ
+- `user-admin-group` メンバーのみ
 
 ### リクエスト
 
@@ -142,7 +142,7 @@
 
 - `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `sys-user-admin-group` メンバーのみ
+- `user-admin-group` メンバーのみ
 
 ### リクエスト
 
@@ -182,7 +182,7 @@
 
 - `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `sys-user-admin-group` メンバーのみ
+- `user-admin-group` メンバーのみ
 
 ### レスポンス
 
@@ -206,7 +206,7 @@
 
 - `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `sys-user-admin-group` メンバーのみ
+- `user-admin-group` メンバーのみ
 
 ### リクエスト
 
@@ -244,7 +244,7 @@
 
 - `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `sys-user-admin-group` メンバーのみ
+- `user-admin-group` メンバーのみ
 
 ### レスポンス
 

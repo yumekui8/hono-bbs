@@ -15,10 +15,14 @@ dist/
 node_modules/
 .wrangler
 
-# env
+# env / config (use *.example.* versions instead)
 .env
 .env.production
 .dev.vars
+wrangler.jsonc
+
+# test scripts (personal use only)
+test/
 
 # logs
 logs/
@@ -32,9 +36,9 @@ lerna-debug.log*
 # misc
 .DS_Store
 
-# Claude 
+
+# git
+.gitignore
+
+# claude
 CLAUDE.md
-
-
-# TEST
-test/*

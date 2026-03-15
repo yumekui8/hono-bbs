@@ -68,12 +68,14 @@ async function computeClientSessionId(ip: string, userAgent: string, date: strin
 
 // Turnstile トークンを検証してセッションを発行する
 // 同一クライアントから同日に既にセッションが存在する場合は alreadyIssued: true を返す
+// ttlMinutes: セッション有効期限 (分単位)。0 = 無期限 (デフォルト: 525600 = 1年)
 export async function issueTurnstileSession(
   kv: KVNamespace,
   token: string,
   secretKey: string | undefined,
   clientIP: string,
   userAgent: string,
+  ttlMinutes: number = 525600,
 ): Promise<TurnstileResult> {
   if (!secretKey) {
     console.error('[Turnstile] TURNSTILE_SECRET_KEY is not configured')
@@ -105,10 +107,13 @@ export async function issueTurnstileSession(
   }
 
   const now = new Date()
-  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+  // ttlMinutes=0 のとき有効期限なし (expiresAt に十分先の日付を設定して期限チェックをスキップ)
+  const expiresAt = ttlMinutes === 0
+    ? '9999-12-31T23:59:59.999Z'
+    : new Date(now.getTime() + ttlMinutes * 60 * 1000).toISOString()
   const session: TurnstileSession = { id: sessionId, createdAt: now.toISOString(), expiresAt }
   try {
-    await sessionRepository.insertTurnstileSession(kv, session)
+    await sessionRepository.insertTurnstileSession(kv, session, ttlMinutes)
   } catch (e) {
     console.error('[Turnstile] KV write failed:', e)
     return { sessionId: null, errorCodes: ['kv-write-failed'] }

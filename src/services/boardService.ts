@@ -26,6 +26,7 @@ const createBoardSchema = z.object({
   defaultThreadOwnerUserId: z.string().optional(),
   defaultThreadOwnerGroupId: z.string().optional(),
   defaultThreadPermissions: z.string().regex(/^\d+,\d+,\d+,\d+$/).optional(),
+  category: z.string().max(128).optional(),
 })
 
 const updateBoardSchema = z.object({
@@ -39,6 +40,7 @@ const updateBoardSchema = z.object({
   defaultMaxPostLength: z.number().int().min(1).optional(),
   defaultPosterName: z.string().max(50).optional(),
   defaultIdFormat: z.enum(['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']).optional(),
+  category: z.string().max(128).nullable().optional(),
 })
 
 export type CreateBoardInput = z.infer<typeof createBoardSchema>
@@ -115,6 +117,7 @@ export async function createBoard(
     defaultThreadOwnerUserId: input.defaultThreadOwnerUserId ?? null,
     defaultThreadOwnerGroupId: input.defaultThreadOwnerGroupId ?? null,
     defaultThreadPermissions: input.defaultThreadPermissions ?? '15,14,12,12',
+    category: input.category ?? null,
     createdAt: new Date().toISOString(),
     adminMeta: { creatorUserId, creatorSessionId, creatorTurnstileSessionId },
   }

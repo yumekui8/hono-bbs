@@ -32,6 +32,9 @@ ADMIN_INITIAL_PASSWORD=password
 # リクエストサイズ上限 (例: "1mb", "500kb", 省略時は無制限)
 # MAX_REQUEST_SIZE=1mb
 
+# Turnstile セッション有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
+# TURNSTILE_TOKEN_TTL=525600
+
 # APIベースパス (wrangler.jsonc の vars.API_BASE_PATH を上書き可)
 # API_BASE_PATH=/api/v1
 
