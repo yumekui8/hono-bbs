@@ -1,0 +1,42 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "hono-bbs",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-03-07",
+	"vars": {
+		// API ベースパス
+		"API_BASE_PATH": "/api/v1",
+		// ユーザ/グループ一覧の 1 ページあたり件数 (0 = 無制限)
+		"USER_DISPLAY_LIMIT": "0",
+		"GROUP_DISPLAY_LIMIT": "0"
+		// ── 以下は wrangler secret put <KEY> で設定することを推奨 ────────────
+		// ADMIN_USERNAME:         管理者ユーザID              (デフォルト: admin)
+		// USER_ADMIN_GROUP:       ユーザ管理グループID         (デフォルト: user-admin-group)
+		// BBS_ADMIN_GROUP:        掲示板管理グループID         (デフォルト: bbs-admin-group)
+		// TURNSTILE_SITE_KEY:     Cloudflare Turnstile サイトキー
+		// TURNSTILE_SECRET_KEY:   Cloudflare Turnstile シークレットキー
+		// DISABLE_TURNSTILE:      'true' で検証をスキップ      (開発用のみ)
+		// ADMIN_INITIAL_PASSWORD: admin 初期パスワード         (POST /auth/setup で使用)
+		// TURNSTILE_TOKEN_TTL:    Turnstile セッション有効期限  (分単位, 0=無期限, デフォルト: 525600=1年)
+		// ENDPOINT_PERMISSIONS:   エンドポイント権限 JSON       (省略時はデフォルト値を使用)
+		// MAX_REQUEST_SIZE:       リクエストサイズ上限          (例: "1mb", "500kb")
+		// CORS_ORIGIN:            許可する CORS オリジン        (カンマ区切り、省略時は *)
+		// BBS_ALLOW_DOMAIN:       許可するドメイン              (カンマ区切り、省略時は制限なし)
+		// ALLOW_BBS_UI_DOMAINS:   Turnstile認証後のリダイレクト許可UIドメイン (カンマ区切り)
+	},
+	"kv_namespaces": [
+		{
+			"binding": "SESSION_KV",
+			// `wrangler kv namespace create SESSION_KV` で作成し、id を設定してください
+			"id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "hono-bbs-db",
+			// `wrangler d1 create hono-bbs-db` で作成し、database_id を設定してください
+			"database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+		}
+	]
+}
