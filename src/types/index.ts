@@ -89,6 +89,8 @@ export type Thread = {
   createdAt: string
   updatedAt: string
   adminMeta: AdminMeta
+  // スレッド一覧取得時のみ含まれる (postNumber=1 の第1レス)
+  firstPost?: Post | null
 }
 
 export type Post = {
@@ -111,20 +113,16 @@ export type AppEnv = {
   Bindings: {
     DB: D1Database
     SESSION_KV: KVNamespace       // ログインセッション・Turnstileセッション保存先
-    TURNSTILE_SITE_KEY: string | undefined
-    TURNSTILE_SECRET_KEY: string | undefined
-    DISABLE_TURNSTILE: string | undefined   // 'true' でスキップ (ローカル開発用)
+    ENABLE_TURNSTILE: string | undefined    // 'true' のとき KV でTurnstileセッションを検証する
     ADMIN_INITIAL_PASSWORD: string | undefined  // POST /auth/setup で使用
     ADMIN_USERNAME: string | undefined      // 管理者ユーザID (デフォルト: admin)
     USER_ADMIN_GROUP: string | undefined    // ユーザ管理グループID (デフォルト: user-admin-group)
     BBS_ADMIN_GROUP: string | undefined     // 掲示板管理グループID (デフォルト: bbs-admin-group)
     ENDPOINT_PERMISSIONS: string | undefined // エンドポイント権限JSON (省略時はデフォルト値を使用)
     MAX_REQUEST_SIZE: string | undefined    // リクエストサイズ上限 例: "1mb", "500kb"
-    TURNSTILE_TOKEN_TTL: string | undefined // Turnstile セッション有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
     API_BASE_PATH: string      // e.g. "/api/v1"
     CORS_ORIGIN: string | undefined  // 許可するオリジン カンマ区切り
     BBS_ALLOW_DOMAIN: string | undefined      // 許可するドメイン カンマ区切り (未設定時は制限なし)
-    ALLOW_BBS_UI_DOMAINS: string | undefined  // Turnstile認証後のリダイレクト許可UIドメイン
     USER_DISPLAY_LIMIT: string | undefined  // ユーザ一覧ページネーション件数 (0=無制限)
     GROUP_DISPLAY_LIMIT: string | undefined // グループ一覧ページネーション件数 (0=無制限)
   }

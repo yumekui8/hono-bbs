@@ -53,6 +53,13 @@
         "creatorSessionId":          { "type": ["string", "null"] },
         "creatorTurnstileSessionId": { "type": ["string", "null"] }
       }
+    },
+    "firstPost": {
+      "description": "スレッド一覧取得時のみ含まれる。第1レス (postNumber=1) のデータ。存在しない場合は null",
+      "oneOf": [
+        { "$ref": "#/Post" },
+        { "type": "null" }
+      ]
     }
   }
 }
@@ -64,6 +71,8 @@
 
 板のメタ情報とスレッド一覧を取得する。
 読み取り権限のないスレッドは除外される。板自体に GET 権限がない場合は 404。
+
+各スレッドには第1レス (`firstPost`) が含まれる。
 
 ### 認証
 
@@ -83,6 +92,7 @@
         "board": { "$ref": "#/Board" },
         "threads": {
           "type": "array",
+          "description": "各スレッドには firstPost フィールドに第1レスのデータが含まれる",
           "items": { "$ref": "#/Thread" }
         }
       }

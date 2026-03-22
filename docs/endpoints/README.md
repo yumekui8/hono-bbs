@@ -9,7 +9,7 @@
 | ヘッダー | 用途 |
 |---|---|
 | `X-Session-Id` | ログインセッションID (`POST /auth/login` で取得) |
-| `X-Turnstile-Session` | Turnstile セッションID (`POST /auth/turnstile` で取得)。全 POST/PUT/DELETE で必要 |
+| `X-Turnstile-Session` | Turnstile セッションID (turnstileApiToken プラグインで取得)。`ENABLE_TURNSTILE=true` 時の全 POST/PUT/DELETE で必要 |
 | `X-User-Token` | 匿名ユーザの displayUserId 計算用トークン |
 
 ### レスポンス形式
@@ -64,10 +64,12 @@
 
 | ファイル | エンドポイント | 説明 |
 |---|---|---|
-| [auth-turnstile.md](./auth-turnstile.md) | `GET/POST /auth/turnstile` | Turnstile チャレンジ・セッション発行 |
 | [auth-setup.md](./auth-setup.md) | `GET/POST /auth/setup` | admin 初期パスワード設定 |
 | [auth-login.md](./auth-login.md) | `GET/POST /auth/login` | ログイン |
 | [auth-logout.md](./auth-logout.md) | `GET/POST /auth/logout` | ログアウト |
+
+> **Note**: `GET/POST /auth/turnstile` は **turnstileApiToken プラグイン** として独立しています。
+> 詳細は `plugins/turnstileApiToken/README.md` を参照してください。
 
 ### プロフィール (Profile)
 
@@ -110,10 +112,7 @@
 
 | 変数名 | 説明 | デフォルト |
 |---|---|---|
-| `TURNSTILE_SITE_KEY` | Cloudflare Turnstile サイトキー | — |
-| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile シークレットキー | — |
-| `DISABLE_TURNSTILE` | `true` で検証をスキップ (開発用) | `false` |
-| `TURNSTILE_TOKEN_TTL` | Turnstile セッション有効期限 (分単位, `0` で無期限) | `525600` (1年) |
+| `ENABLE_TURNSTILE` | `true` で `X-Turnstile-Session` ヘッダーを SESSION_KV で検証する | — (無効) |
 | `ADMIN_INITIAL_PASSWORD` | `POST /auth/setup` で使用する初期パスワード | — |
 | `ADMIN_USERNAME` | 管理者ユーザID | `admin` |
 | `USER_ADMIN_GROUP` | ユーザ管理グループID | `user-admin-group` |
@@ -123,9 +122,11 @@
 | `API_BASE_PATH` | API ベースパス | `/api/v1` |
 | `CORS_ORIGIN` | 許可する CORS オリジン (カンマ区切り) | `*` |
 | `BBS_ALLOW_DOMAIN` | 許可するドメイン (カンマ区切り、未設定で制限なし) | — |
-| `ALLOW_BBS_UI_DOMAINS` | Turnstile認証後のリダイレクト許可UIドメイン (カンマ区切り) | — |
 | `USER_DISPLAY_LIMIT` | ユーザ一覧の1ページあたり件数 (0=無制限) | `0` |
 | `GROUP_DISPLAY_LIMIT` | グループ一覧の1ページあたり件数 (0=無制限) | `0` |
+
+> **Turnstile 関連の設定** (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_TOKEN_TTL`, `ALLOW_BBS_UI_DOMAINS`) は **turnstileApiToken プラグイン** 側の設定です。
+> hono-bbs 本体が参照するのは `ENABLE_TURNSTILE` と `SESSION_KV` のみです。
 
 ### ENDPOINT_PERMISSIONS の形式
 

@@ -1,0 +1,41 @@
+{
+  // このファイルを wrangler.jsonc にコピーして使用してください
+  // cp wrangler.example.jsonc wrangler.jsonc
+
+  "name": "dat-import",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+
+  // hono-bbs 本体と同じ D1 データベースを共有する
+  // wrangler.jsonc の d1_databases[].database_id と同じ値を設定すること
+  "d1_databases": [
+    {
+      "binding": "BBS_DB",
+      "database_name": "hono-bbs-db",
+      "database_id": "<SAME_DATABASE_ID_AS_HONO_BBS>"
+    }
+  ],
+
+  // デプロイ先のドメインとパス
+  // hono-bbs 本体と異なるパスに配置すること
+  // "routes": [
+  //   {
+  //     "pattern": "api.example.com/admin/*",
+  //     "zone_name": "example.com"
+  //   }
+  // ],
+
+  "vars": {
+    // エンドポイントのベースパス (未設定時はルート直下)
+    // 例: "/admin" → POST /admin/admin/datimport
+    // 例: "" (未設定) → POST /admin/datimport
+    // "BASE_PATH": "/dat",
+
+    // 掲示板管理者グループ ID (hono-bbs の BBS_ADMIN_GROUP と同じ値にすること)
+    // デフォルト: "bbs-admin-group"
+    // "BBS_ADMIN_GROUP": "bbs-admin-group",
+
+    // 許可する CORS オリジン (カンマ区切り、未設定時は *)
+    // "CORS_ORIGIN": "https://app.example.com"
+  }
+}

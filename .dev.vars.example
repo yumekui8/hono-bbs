@@ -1,14 +1,10 @@
 # このファイルをコピーして .dev.vars を作成してください
 # cp .dev.vars.example .dev.vars
 
-# Cloudflare Turnstile サイトキー (フロントエンドの HTML ページで使用)
-TURNSTILE_SITE_KEY=your-turnstile-site-key-here
-
-# Cloudflare Turnstile シークレットキー (バックエンド検証用)
-TURNSTILE_SECRET_KEY=your-turnstile-secret-key-here
-
-# 開発環境で Turnstile をスキップする場合は true に設定
-DISABLE_TURNSTILE=true
+# Turnstile セッション検証を有効にする場合は true に設定
+# true のとき X-Turnstile-Session ヘッダーを KV で検証する
+# 未設定または false のときは検証をスキップする (ローカル開発時は未設定推奨)
+# ENABLE_TURNSTILE=true
 
 # admin ユーザーの初期パスワード (POST /auth/setup で使用)
 ADMIN_INITIAL_PASSWORD=password
@@ -32,9 +28,6 @@ ADMIN_INITIAL_PASSWORD=password
 # リクエストサイズ上限 (例: "1mb", "500kb", 省略時は無制限)
 # MAX_REQUEST_SIZE=1mb
 
-# Turnstile セッション有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
-# TURNSTILE_TOKEN_TTL=525600
-
 # APIベースパス (wrangler.jsonc の vars.API_BASE_PATH を上書き可)
 # API_BASE_PATH=/api/v1
 
@@ -44,9 +37,6 @@ CORS_ORIGIN=http://localhost:5173
 
 # 許可するドメイン (カンマ区切りで複数指定可、未設定時は制限なし)
 # BBS_ALLOW_DOMAIN=localhost:8787,example.com
-
-# Turnstile認証後にリダイレクトを許可するUIドメイン (カンマ区切り、未設定時はリダイレクトなし)
-# ALLOW_BBS_UI_DOMAINS=localhost:5173,bbs.example.com
 
 # ユーザ一覧ページネーション件数 (0=無制限)
 # USER_DISPLAY_LIMIT=0

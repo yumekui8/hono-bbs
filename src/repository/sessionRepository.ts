@@ -58,17 +58,3 @@ export async function findTurnstileSessionById(
   return data
 }
 
-export async function insertTurnstileSession(
-  kv: KVNamespace,
-  session: TurnstileSession,
-  ttlMinutes: number, // 0 = 無期限
-): Promise<void> {
-  const options: KVNamespacePutOptions = ttlMinutes > 0
-    ? { expirationTtl: ttlMinutes * 60 }
-    : {}
-  await kv.put(TURNSTILE_PREFIX + session.id, JSON.stringify(session), options)
-}
-
-export async function deleteTurnstileSession(kv: KVNamespace, id: string): Promise<void> {
-  await kv.delete(TURNSTILE_PREFIX + id)
-}

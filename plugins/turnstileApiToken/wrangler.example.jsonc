@@ -1,0 +1,54 @@
+{
+  // このファイルを wrangler.jsonc にコピーして使用してください
+  // cp wrangler.example.jsonc wrangler.jsonc
+
+  "name": "turnstile-api-token",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+
+  // SESSION_KV は hono-bbs 本体と同じ KV ネームスペースを指定すること
+  // hono-bbs の wrangler.jsonc に記載された SESSION_KV の id と一致させる
+  "kv_namespaces": [
+    {
+      "binding": "SESSION_KV",
+      "id": "<YOUR_KV_NAMESPACE_ID>"
+    }
+  ],
+
+  // デプロイ先のドメインとパスを設定する
+  // TURNSTILE_PATH と routes のパスパターンを合わせること
+  "routes": [
+    {
+      "pattern": "example.com/auth/turnstile",
+      "zone_name": "example.com"
+    }
+  ],
+
+  "vars": {
+    // Turnstile サイトキー (公開値、シークレットではない)
+    "TURNSTILE_SITE_KEY": "<YOUR_TURNSTILE_SITE_KEY>",
+
+    // このWorkerが応答するパス (routes のパスパターンと合わせる)
+    // デフォルト: /auth/turnstile
+    "TURNSTILE_PATH": "/auth/turnstile",
+
+    // Turnstile セッション有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
+    "TURNSTILE_TOKEN_TTL": "525600",
+
+    // 許可ドメイン (カンマ区切り、未設定時は制限なし)
+    // "BBS_ALLOW_DOMAIN": "example.com",
+
+    // Turnstile 認証後のリダイレクト許可UIドメイン (カンマ区切り)
+    // 設定するとウィジェット画面でセッションIDを表示する代わりにこのドメインへリダイレクトする
+    // "ALLOW_BBS_UI_DOMAINS": "app.example.com",
+
+    // 許可するオリジン (カンマ区切り、未設定時は *)
+    // "CORS_ORIGIN": "https://app.example.com",
+
+    // ローカル開発時に Turnstile をスキップする場合は .dev.vars に記載
+    // "DISABLE_TURNSTILE": "true"
+  },
+
+  // シークレット類は wrangler secret put で設定すること
+  // wrangler secret put TURNSTILE_SECRET_KEY
+}

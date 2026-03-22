@@ -1,8 +1,6 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import {
-  turnstilePageHandler,
-  turnstileVerifyHandler,
   getSetupInfoHandler,
   setupHandler,
   getLoginInfoHandler,
@@ -12,9 +10,6 @@ import {
 } from '../handlers/authHandler'
 
 const auth = new Hono<AppEnv>()
-
-auth.get('/turnstile', turnstilePageHandler)
-auth.post('/turnstile', turnstileVerifyHandler)
 
 auth.get('/setup', getSetupInfoHandler)
 auth.post('/setup', setupHandler)

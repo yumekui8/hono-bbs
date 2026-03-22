@@ -1,4 +1,4 @@
-import type { Thread } from '../types'
+import type { Thread, Post } from '../types'
 
 type ThreadRow = {
   id: string
@@ -21,6 +21,24 @@ type ThreadRow = {
   creator_user_id: string | null
   creator_session_id: string | null
   creator_turnstile_session_id: string | null
+}
+
+// 第1レスのカラムをエイリアスで結合する際の拡張型
+type ThreadWithFirstPostRow = ThreadRow & {
+  p_id: string | null
+  p_post_number: number | null
+  p_owner_user_id: string | null
+  p_owner_group_id: string | null
+  p_permissions: string | null
+  p_user_id: string | null
+  p_display_user_id: string | null
+  p_poster_name: string | null
+  p_poster_sub_info: string | null
+  p_content: string | null
+  p_created_at: string | null
+  p_creator_user_id: string | null
+  p_creator_session_id: string | null
+  p_creator_turnstile_session_id: string | null
 }
 
 function rowToThread(row: ThreadRow): Thread {
@@ -50,12 +68,56 @@ function rowToThread(row: ThreadRow): Thread {
   }
 }
 
+function rowToFirstPost(row: ThreadWithFirstPostRow): Post | null {
+  if (!row.p_id) return null
+  return {
+    id: row.p_id,
+    threadId: row.id,
+    postNumber: row.p_post_number!,
+    ownerUserId: row.p_owner_user_id,
+    ownerGroupId: row.p_owner_group_id,
+    permissions: row.p_permissions!,
+    userId: row.p_user_id,
+    displayUserId: row.p_display_user_id!,
+    posterName: row.p_poster_name!,
+    posterSubInfo: row.p_poster_sub_info,
+    content: row.p_content!,
+    createdAt: row.p_created_at!,
+    adminMeta: {
+      creatorUserId: row.p_creator_user_id,
+      creatorSessionId: row.p_creator_session_id,
+      creatorTurnstileSessionId: row.p_creator_turnstile_session_id,
+    },
+  }
+}
+
 export async function findThreadsByBoardId(db: D1Database, boardId: string): Promise<Thread[]> {
   const result = await db
-    .prepare('SELECT * FROM threads WHERE board_id = ? ORDER BY updated_at DESC')
+    .prepare(`
+      SELECT
+        t.*,
+        p.id AS p_id,
+        p.post_number AS p_post_number,
+        p.owner_user_id AS p_owner_user_id,
+        p.owner_group_id AS p_owner_group_id,
+        p.permissions AS p_permissions,
+        p.user_id AS p_user_id,
+        p.display_user_id AS p_display_user_id,
+        p.poster_name AS p_poster_name,
+        p.poster_sub_info AS p_poster_sub_info,
+        p.content AS p_content,
+        p.created_at AS p_created_at,
+        p.creator_user_id AS p_creator_user_id,
+        p.creator_session_id AS p_creator_session_id,
+        p.creator_turnstile_session_id AS p_creator_turnstile_session_id
+      FROM threads t
+      LEFT JOIN posts p ON p.thread_id = t.id AND p.post_number = 1
+      WHERE t.board_id = ?
+      ORDER BY t.updated_at DESC
+    `)
     .bind(boardId)
-    .all<ThreadRow>()
-  return result.results.map(rowToThread)
+    .all<ThreadWithFirstPostRow>()
+  return result.results.map(row => ({ ...rowToThread(row), firstPost: rowToFirstPost(row) }))
 }
 
 export async function findThreadById(db: D1Database, id: string): Promise<Thread | null> {

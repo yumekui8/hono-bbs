@@ -3,9 +3,9 @@ import type { AppEnv } from '../types'
 import * as sessionRepository from '../repository/sessionRepository'
 
 // X-Turnstile-Session ヘッダーで Turnstile セッションを検証するミドルウェア
+// ENABLE_TURNSTILE=true のときのみ KV 検証を行う。未設定または false のときはスキップ。
 export const requireTurnstile: MiddlewareHandler<AppEnv> = async (c, next) => {
-  // 開発環境ではスキップ可能 (.dev.vars に DISABLE_TURNSTILE=true を設定)
-  if (c.env.DISABLE_TURNSTILE === 'true') {
+  if (c.env.ENABLE_TURNSTILE !== 'true') {
     await next()
     return
   }

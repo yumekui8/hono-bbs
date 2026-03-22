@@ -6,10 +6,12 @@ function adminVisible(c: Context<AppEnv>): boolean {
   return c.get('isAdmin') || c.get('isUserAdmin')
 }
 
-function stripThread(thread: Thread, visible: boolean): Thread | Omit<Thread, 'adminMeta'> {
-  if (visible) return thread
-  const { adminMeta: _dropped, ...rest } = thread
-  return rest
+function stripThread(thread: Thread, visible: boolean) {
+  const { adminMeta, firstPost, ...rest } = thread
+  // firstPost が存在する場合は adminMeta を同様に制御
+  const strippedFirstPost = firstPost ? stripPost(firstPost, visible) : firstPost
+  if (visible) return { ...rest, adminMeta, firstPost: strippedFirstPost }
+  return { ...rest, firstPost: strippedFirstPost }
 }
 
 function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
