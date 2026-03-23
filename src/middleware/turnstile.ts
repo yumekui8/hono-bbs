@@ -15,7 +15,7 @@ export const requireTurnstile: MiddlewareHandler<AppEnv> = async (c, next) => {
     return c.json({ error: 'TURNSTILE_REQUIRED', message: 'X-Turnstile-Session header required' }, 400)
   }
 
-  const session = await sessionRepository.findTurnstileSessionById(c.env.SESSION_KV, sessionId)
+  const session = await sessionRepository.findTurnstileSessionById(c.get('kv'), sessionId)
   if (!session) {
     return c.json({ error: 'TURNSTILE_INVALID', message: 'Invalid or expired Turnstile session' }, 400)
   }

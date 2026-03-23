@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { User, Group } from '../types'
+import type { DbAdapter } from '../adapters/db'
 import type { SystemIds } from '../utils/constants'
 import * as userRepository from '../repository/userRepository'
 import * as groupRepository from '../repository/groupRepository'
@@ -67,7 +68,7 @@ export function parseGroup(data: unknown): GroupInput {
 
 // ユーザ新規作成 (Turnstile 必須の POST /identity/users)
 export async function createUser(
-  db: D1Database,
+  db: DbAdapter,
   input: CreateUserInput,
   sysIds: SystemIds,
 ): Promise<User> {
@@ -86,12 +87,12 @@ export async function createUser(
 }
 
 // ユーザ一覧 (ページネーション対応)
-export async function listUsers(db: D1Database, page: number, limit: number): Promise<User[]> {
+export async function listUsers(db: DbAdapter, page: number, limit: number): Promise<User[]> {
   return userRepository.listUsers(db, page, limit)
 }
 
 export async function getUser(
-  db: D1Database,
+  db: DbAdapter,
   targetUserId: string,
   requestUserId: string | null,
   isUserAdmin: boolean,
@@ -102,7 +103,7 @@ export async function getUser(
 
 // 自分のプロフィール更新 (パスワード変更も同時に可能)
 export async function updateProfile(
-  db: D1Database,
+  db: DbAdapter,
   userId: string,
   input: UpdateProfileInput,
 ): Promise<User | null> {
@@ -128,7 +129,7 @@ export async function updateProfile(
 
 // 管理者による任意ユーザ更新 (isActive 変更可)
 export async function updateUser(
-  db: D1Database,
+  db: DbAdapter,
   targetUserId: string,
   input: UpdateUserAdminInput,
   requestUserId: string | null,
@@ -148,7 +149,7 @@ export async function updateUser(
 }
 
 export async function deleteUser(
-  db: D1Database,
+  db: DbAdapter,
   targetUserId: string,
   sysIds: SystemIds,
 ): Promise<void> {
@@ -158,7 +159,7 @@ export async function deleteUser(
 }
 
 export async function deleteMe(
-  db: D1Database,
+  db: DbAdapter,
   userId: string,
   sysIds: SystemIds,
 ): Promise<void> {
@@ -169,15 +170,15 @@ export async function deleteMe(
 
 // ── グループ操作 ──────────────────────────────────────────
 
-export async function listGroups(db: D1Database, page: number, limit: number): Promise<Group[]> {
+export async function listGroups(db: DbAdapter, page: number, limit: number): Promise<Group[]> {
   return groupRepository.listGroups(db, page, limit)
 }
 
-export async function getGroup(db: D1Database, groupId: string): Promise<Group | null> {
+export async function getGroup(db: DbAdapter, groupId: string): Promise<Group | null> {
   return groupRepository.findGroupById(db, groupId)
 }
 
-export async function createGroup(db: D1Database, input: GroupInput): Promise<Group> {
+export async function createGroup(db: DbAdapter, input: GroupInput): Promise<Group> {
   const existing = await groupRepository.findGroupByName(db, input.name)
   if (existing) throw new Error('GROUP_NAME_TAKEN')
   const group: Group = {
@@ -190,7 +191,7 @@ export async function createGroup(db: D1Database, input: GroupInput): Promise<Gr
 }
 
 export async function updateGroup(
-  db: D1Database,
+  db: DbAdapter,
   groupId: string,
   input: GroupInput,
   sysIds: SystemIds,
@@ -206,7 +207,7 @@ export async function updateGroup(
 }
 
 export async function deleteGroup(
-  db: D1Database,
+  db: DbAdapter,
   groupId: string,
   sysIds: SystemIds,
 ): Promise<void> {
@@ -220,7 +221,7 @@ export async function deleteGroup(
 }
 
 export async function addGroupMember(
-  db: D1Database,
+  db: DbAdapter,
   groupId: string,
   userId: string,
 ): Promise<void> {
@@ -232,7 +233,7 @@ export async function addGroupMember(
 }
 
 export async function removeGroupMember(
-  db: D1Database,
+  db: DbAdapter,
   groupId: string,
   userId: string,
 ): Promise<void> {

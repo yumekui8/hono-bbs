@@ -1,4 +1,5 @@
 import type { Session, TurnstileSession } from '../types'
+import type { KvAdapter } from '../adapters/kv'
 
 // KV キープレフィックス
 const SESSION_PREFIX    = 'session:'
@@ -6,7 +7,7 @@ const TURNSTILE_PREFIX  = 'turnstile:'
 
 // ── ログインセッション ──────────────────────────────────────
 
-export async function findSessionById(kv: KVNamespace, id: string): Promise<Session | null> {
+export async function findSessionById(kv: KvAdapter, id: string): Promise<Session | null> {
   const data = await kv.get<Session>(SESSION_PREFIX + id, 'json')
   if (!data) return null
   // KV の TTL で自動期限切れするが、念のためチェック
@@ -19,19 +20,19 @@ export async function findSessionById(kv: KVNamespace, id: string): Promise<Sess
   return data
 }
 
-export async function insertSession(kv: KVNamespace, session: Session): Promise<void> {
+export async function insertSession(kv: KvAdapter, session: Session): Promise<void> {
   const ttlSeconds = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000)
   await kv.put(SESSION_PREFIX + session.id, JSON.stringify(session), {
     expirationTtl: Math.max(ttlSeconds, 60),
   })
 }
 
-export async function deleteSession(kv: KVNamespace, id: string): Promise<void> {
+export async function deleteSession(kv: KvAdapter, id: string): Promise<void> {
   await kv.delete(SESSION_PREFIX + id)
 }
 
 // セッションの isActive フラグを更新する (管理者によるセッション無効化に使用)
-export async function updateSessionActive(kv: KVNamespace, id: string, isActive: boolean): Promise<boolean> {
+export async function updateSessionActive(kv: KvAdapter, id: string, isActive: boolean): Promise<boolean> {
   const data = await kv.get<Session>(SESSION_PREFIX + id, 'json')
   if (!data) return false
   const updated: Session = { ...data, isActive }
@@ -46,7 +47,7 @@ export async function updateSessionActive(kv: KVNamespace, id: string, isActive:
 // ── Turnstile セッション ────────────────────────────────────
 
 export async function findTurnstileSessionById(
-  kv: KVNamespace,
+  kv: KvAdapter,
   id: string,
 ): Promise<TurnstileSession | null> {
   const data = await kv.get<TurnstileSession>(TURNSTILE_PREFIX + id, 'json')
@@ -57,4 +58,3 @@ export async function findTurnstileSessionById(
   }
   return data
 }
-

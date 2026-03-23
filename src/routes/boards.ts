@@ -17,6 +17,7 @@ import {
   getPostHandler,
   createPostHandler,
   updatePostHandler,
+  deletePostHandler,
 } from '../handlers/postHandler'
 import { requireLogin } from '../middleware/auth'
 import { requireTurnstile } from '../middleware/turnstile'
@@ -46,5 +47,6 @@ boards.post('/:boardId/:threadId', requireTurnstile, createPostHandler)
 // ── 特定投稿 (responseNumber = postNumber) ───────────────
 boards.get('/:boardId/:threadId/:responseNumber', getPostHandler)
 boards.put('/:boardId/:threadId/:responseNumber', requireTurnstile, updatePostHandler)
+boards.delete('/:boardId/:threadId/:responseNumber', requireTurnstile, deletePostHandler)
 
 export default boards

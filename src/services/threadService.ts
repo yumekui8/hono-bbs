@@ -1,8 +1,12 @@
 import { z } from 'zod'
 import type { Thread, Board, Post } from '../types'
+import type { DbAdapter } from '../adapters/db'
 import * as threadRepository from '../repository/threadRepository'
 import * as boardRepository from '../repository/boardRepository'
 import * as postRepository from '../repository/postRepository'
+import type { PostRange } from '../repository/postRepository'
+
+export type { PostRange }
 import { hasPermission } from '../utils/permission'
 import { computeDisplayUserId } from '../utils/hash'
 
@@ -34,7 +38,7 @@ export function parseUpdateThread(data: unknown): UpdateThreadInput {
 // 板情報とスレッド一覧を一緒に返す (GET /boards/:boardId)
 // 読み取り権限のないスレッドは除外される
 export async function getThreadsWithBoard(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   userId: string | null,
   userGroupIds: string[],
@@ -58,14 +62,16 @@ export async function getThreadsWithBoard(
 }
 
 // スレッド情報と投稿一覧を一緒に返す (GET /boards/:boardId/:threadId)
+// ranges を指定すると該当範囲の投稿のみ返す (差分取得・部分取得)
 // 読み取り権限のない投稿は除外される
 export async function getThreadWithPosts(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   userId: string | null,
   userGroupIds: string[],
   isAdmin: boolean,
+  ranges?: PostRange[],
 ): Promise<{ thread: Thread; posts: Post[] } | null> {
   const thread = await threadRepository.findThreadById(db, threadId)
   if (!thread || thread.boardId !== boardId) return null
@@ -73,7 +79,9 @@ export async function getThreadWithPosts(
   if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'GET', isAdmin })) {
     return null
   }
-  const posts = await postRepository.findPostsByThreadId(db, threadId)
+  const posts = ranges
+    ? await postRepository.findPostsByRanges(db, threadId, ranges)
+    : await postRepository.findPostsByThreadId(db, threadId)
   if (isAdmin) return { thread, posts }
   // 読み取り権限のない投稿を除外
   const filtered = posts.filter(p => hasPermission({
@@ -85,7 +93,7 @@ export async function getThreadWithPosts(
 }
 
 export async function createThread(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   input: CreateThreadInput,
   userId: string | null,
@@ -167,7 +175,7 @@ export async function createThread(
 }
 
 export async function updateThread(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   input: UpdateThreadInput,
@@ -187,7 +195,7 @@ export async function updateThread(
 }
 
 export async function deleteThread(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   userId: string | null,

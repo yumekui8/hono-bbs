@@ -2,6 +2,50 @@ import type { Context } from 'hono'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import type { AppEnv, Thread, Post } from '../types'
 import * as threadService from '../services/threadService'
+import type { PostRange } from '../services/threadService'
+
+// "N", "N-", "N-M", "-N" の単一レンジをパース
+function parseOneRange(s: string): PostRange | null {
+  if (s.startsWith('-')) {
+    // -N: 1 to N
+    const n = parseInt(s.slice(1), 10)
+    if (isNaN(n) || n < 1) return null
+    return { from: 1, to: n }
+  }
+  if (s.endsWith('-')) {
+    // N-: N to end
+    const n = parseInt(s.slice(0, -1), 10)
+    if (isNaN(n) || n < 1) return null
+    return { from: n, to: null }
+  }
+  const dashIdx = s.indexOf('-')
+  if (dashIdx !== -1) {
+    // N-M
+    const from = parseInt(s.slice(0, dashIdx), 10)
+    const to   = parseInt(s.slice(dashIdx + 1), 10)
+    if (isNaN(from) || isNaN(to) || from < 1 || to < from) return null
+    return { from, to }
+  }
+  // N: single
+  const n = parseInt(s, 10)
+  if (isNaN(n) || n < 1) return null
+  return { from: n, to: n }
+}
+
+const MAX_POST_RANGES = 20 // レンジ数の上限 (DoS 対策)
+
+// カンマ区切りで複数レンジをパース。不正な値・上限超過は null を返す
+function parsePostRanges(param: string): PostRange[] | null {
+  const parts = param.split(',').map(s => s.trim()).filter(Boolean)
+  if (parts.length === 0 || parts.length > MAX_POST_RANGES) return null
+  const ranges: PostRange[] = []
+  for (const part of parts) {
+    const r = parseOneRange(part)
+    if (!r) return null
+    ranges.push(r)
+  }
+  return ranges
+}
 function adminVisible(c: Context<AppEnv>): boolean {
   return c.get('isAdmin') || c.get('isUserAdmin')
 }
@@ -14,9 +58,16 @@ function stripThread(thread: Thread, visible: boolean) {
   return { ...rest, firstPost: strippedFirstPost }
 }
 
+// 削除済み投稿のコンテンツをマスク
+function maskDeletedPost(post: Post): Post {
+  if (!post.isDeleted) return post
+  return { ...post, posterName: 'あぼーん', posterSubInfo: null, content: 'このレスは削除されました' }
+}
+
 function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
-  if (visible) return post
-  const { adminMeta: _dropped, ...rest } = post
+  const masked = maskDeletedPost(post)
+  if (visible) return masked
+  const { adminMeta: _dropped, ...rest } = masked
   return rest
 }
 
@@ -24,7 +75,7 @@ function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'>
 export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const result = await threadService.getThreadsWithBoard(
-    c.env.DB, boardId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    c.get('db'), boardId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
   )
   if (!result) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
   const visible = adminVisible(c)
@@ -37,11 +88,27 @@ export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
 }
 
 // GET /boards/:boardId/:threadId - スレッド情報 + 投稿一覧
+// ?posts= でレンジ指定が可能 (省略時は全件)
+//   単一:      ?posts=5       → 5番のみ
+//   以降:      ?posts=10-     → 10番以降
+//   以前:      ?posts=-20     → 1〜20番
+//   範囲:      ?posts=10-20   → 10〜20番
+//   複数:      ?posts=1-5,10,20-  → 複数レンジをカンマ区切り
 export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
+  const postsParam = c.req.query('posts')
+  let ranges: PostRange[] | undefined
+  if (postsParam != null) {
+    const parsed = parsePostRanges(postsParam)
+    if (!parsed) {
+      return c.json({ error: 'VALIDATION_ERROR', message: 'Invalid posts range. Use formats: N, N-, N-M, -N or comma-separated combinations' }, 400)
+    }
+    ranges = parsed
+  }
   const result = await threadService.getThreadWithPosts(
-    c.env.DB, boardId, threadId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    c.get('db'), boardId, threadId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    ranges,
   )
   if (!result) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
   const visible = adminVisible(c)
@@ -60,7 +127,7 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
     const body = await c.req.json()
     const input = threadService.parseCreateThread(body)
     const result = await threadService.createThread(
-      c.env.DB, boardId, input,
+      c.get('db'), boardId, input,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
@@ -96,7 +163,7 @@ export async function updateThreadHandler(c: Context<AppEnv>): Promise<Response>
     const body = await c.req.json()
     const input = threadService.parseUpdateThread(body)
     const thread = await threadService.updateThread(
-      c.env.DB, boardId, threadId, input,
+      c.get('db'), boardId, threadId, input,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!thread) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
@@ -116,7 +183,7 @@ export async function deleteThreadHandler(c: Context<AppEnv>): Promise<Response>
   const threadId = c.req.param('threadId')
   try {
     const deleted = await threadService.deleteThread(
-      c.env.DB, boardId, threadId,
+      c.get('db'), boardId, threadId,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!deleted) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)

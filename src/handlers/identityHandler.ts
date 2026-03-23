@@ -16,7 +16,7 @@ function getLimit(envVal: string | undefined): number {
 export async function listUsersHandler(c: Context<AppEnv>): Promise<Response> {
   const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10))
   const limit = getLimit(c.env.USER_DISPLAY_LIMIT)
-  const users = await identityService.listUsers(c.env.DB, page, limit)
+  const users = await identityService.listUsers(c.get('db'), page, limit)
   return c.json({ data: users, page, limit })
 }
 
@@ -26,7 +26,7 @@ export async function createUserHandler(c: Context<AppEnv>): Promise<Response> {
   try {
     const body = await c.req.json()
     const input = identityService.parseCreateUser(body)
-    const user = await identityService.createUser(c.env.DB, input, sysIds)
+    const user = await identityService.createUser(c.get('db'), input, sysIds)
     return c.json({ data: user }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
@@ -41,7 +41,7 @@ export async function createUserHandler(c: Context<AppEnv>): Promise<Response> {
 export async function getUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
   try {
-    const user = await identityService.getUser(c.env.DB, targetId, c.get('userId'), c.get('isUserAdmin'))
+    const user = await identityService.getUser(c.get('db'), targetId, c.get('userId'), c.get('isUserAdmin'))
     if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     return c.json({ data: user })
   } catch (e) {
@@ -58,7 +58,7 @@ export async function updateUserHandler(c: Context<AppEnv>): Promise<Response> {
   try {
     const body = await c.req.json()
     const input = identityService.parseUpdateUserAdmin(body)
-    const user = await identityService.updateUser(c.env.DB, targetId, input, c.get('userId'), c.get('isUserAdmin'))
+    const user = await identityService.updateUser(c.get('db'), targetId, input, c.get('userId'), c.get('isUserAdmin'))
     if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     return c.json({ data: user })
   } catch (e) {
@@ -76,7 +76,7 @@ export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
   const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteUser(c.env.DB, targetId, sysIds)
+    await identityService.deleteUser(c.get('db'), targetId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
@@ -93,14 +93,14 @@ export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
 export async function listGroupsHandler(c: Context<AppEnv>): Promise<Response> {
   const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10))
   const limit = getLimit(c.env.GROUP_DISPLAY_LIMIT)
-  const groups = await identityService.listGroups(c.env.DB, page, limit)
+  const groups = await identityService.listGroups(c.get('db'), page, limit)
   return c.json({ data: groups, page, limit })
 }
 
 // GET /identity/groups/:id
 export async function getGroupHandler(c: Context<AppEnv>): Promise<Response> {
   const groupId = c.req.param('id')
-  const group = await identityService.getGroup(c.env.DB, groupId)
+  const group = await identityService.getGroup(c.get('db'), groupId)
   if (!group) return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
   return c.json({ data: group })
 }
@@ -110,7 +110,7 @@ export async function createGroupHandler(c: Context<AppEnv>): Promise<Response> 
   try {
     const body = await c.req.json()
     const input = identityService.parseGroup(body)
-    const group = await identityService.createGroup(c.env.DB, input)
+    const group = await identityService.createGroup(c.get('db'), input)
     return c.json({ data: group }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
@@ -128,7 +128,7 @@ export async function updateGroupHandler(c: Context<AppEnv>): Promise<Response> 
   try {
     const body = await c.req.json()
     const input = identityService.parseGroup(body)
-    const group = await identityService.updateGroup(c.env.DB, groupId, input, sysIds)
+    const group = await identityService.updateGroup(c.get('db'), groupId, input, sysIds)
     if (!group) return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
     return c.json({ data: group })
   } catch (e) {
@@ -146,7 +146,7 @@ export async function deleteGroupHandler(c: Context<AppEnv>): Promise<Response> 
   const groupId = c.req.param('id')
   const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteGroup(c.env.DB, groupId, sysIds)
+    await identityService.deleteGroup(c.get('db'), groupId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
@@ -165,7 +165,7 @@ export async function addGroupMemberHandler(c: Context<AppEnv>): Promise<Respons
     return c.json({ error: 'VALIDATION_ERROR', message: 'userId is required' }, 400)
   }
   try {
-    await identityService.addGroupMember(c.env.DB, groupId, body.userId)
+    await identityService.addGroupMember(c.get('db'), groupId, body.userId)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
@@ -181,7 +181,7 @@ export async function removeGroupMemberHandler(c: Context<AppEnv>): Promise<Resp
   const groupId = c.req.param('id')
   const userId = c.req.param('userId')
   try {
-    await identityService.removeGroupMember(c.env.DB, groupId, userId)
+    await identityService.removeGroupMember(c.get('db'), groupId, userId)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error && e.message === 'MEMBER_NOT_FOUND') {

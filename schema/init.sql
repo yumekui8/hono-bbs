@@ -109,6 +109,7 @@ CREATE TABLE posts (
   poster_name TEXT NOT NULL,
   poster_sub_info TEXT,
   content TEXT NOT NULL,
+  is_deleted INTEGER NOT NULL DEFAULT 0,            -- ソフト削除フラグ (1=削除済み)
   created_at TEXT NOT NULL,
   creator_user_id TEXT,
   creator_session_id TEXT,

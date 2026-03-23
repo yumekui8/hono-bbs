@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Board, IdFormat } from '../types'
+import type { DbAdapter } from '../adapters/db'
 import type { SystemIds } from '../utils/constants'
 import type { EndpointPermissionsMap } from '../utils/endpointPermissions'
 import { getEndpointPermConfig } from '../utils/endpointPermissions'
@@ -55,7 +56,7 @@ export function parseUpdateBoard(data: unknown): UpdateBoardInput {
 }
 
 export async function getBoards(
-  db: D1Database,
+  db: DbAdapter,
   userId: string | null,
   userGroupIds: string[],
   isAdmin: boolean,
@@ -89,7 +90,7 @@ export function checkBoardsCollectionPermission(
 }
 
 export async function createBoard(
-  db: D1Database,
+  db: DbAdapter,
   input: CreateBoardInput,
   creatorUserId: string | null,
   creatorPrimaryGroupId: string | null,
@@ -126,7 +127,7 @@ export async function createBoard(
 }
 
 export async function updateBoard(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   input: UpdateBoardInput,
   userId: string | null,
@@ -145,7 +146,7 @@ export async function updateBoard(
 }
 
 export async function deleteBoard(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   userId: string | null,
   userGroupIds: string[],

@@ -18,7 +18,7 @@ function stripAdminMeta(board: Board, visible: boolean): Board | Omit<Board, 'ad
 
 // GET /boards
 export async function getBoardsHandler(c: Context<AppEnv>): Promise<Response> {
-  const boards = await boardService.getBoards(c.env.DB, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'))
+  const boards = await boardService.getBoards(c.get('db'), c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'))
   const visible = adminVisible(c)
   const sysIds = getSystemIds(c.env)
   const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
@@ -47,7 +47,7 @@ export async function createBoardHandler(c: Context<AppEnv>): Promise<Response> 
     const body = await c.req.json()
     const input = boardService.parseCreateBoard(body)
     const board = await boardService.createBoard(
-      c.env.DB, input, c.get('userId'), c.get('primaryGroupId'),
+      c.get('db'), input, c.get('userId'), c.get('primaryGroupId'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
@@ -65,7 +65,7 @@ export async function updateBoardHandler(c: Context<AppEnv>): Promise<Response> 
     const body = await c.req.json()
     const input = boardService.parseUpdateBoard(body)
     const board = await boardService.updateBoard(
-      c.env.DB, boardId, input,
+      c.get('db'), boardId, input,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!board) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
@@ -84,7 +84,7 @@ export async function deleteBoardHandler(c: Context<AppEnv>): Promise<Response> 
   const boardId = c.req.param('boardId')
   try {
     const deleted = await boardService.deleteBoard(
-      c.env.DB, boardId,
+      c.get('db'), boardId,
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!deleted) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)

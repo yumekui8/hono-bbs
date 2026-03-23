@@ -8,7 +8,7 @@ import { parseEndpointPermissions, getEndpointPermConfig } from '../utils/endpoi
 // GET /profile - 自分のプロフィール取得
 export async function getProfileHandler(c: Context<AppEnv>): Promise<Response> {
   const userId = c.get('userId')!
-  const user = await identityService.getUser(c.env.DB, userId, userId, true)
+  const user = await identityService.getUser(c.get('db'), userId, userId, true)
   if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
   const sysIds = getSystemIds(c.env)
   const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
@@ -25,7 +25,7 @@ export async function updateProfileHandler(c: Context<AppEnv>): Promise<Response
   try {
     const body = await c.req.json()
     const input = identityService.parseUpdateProfile(body)
-    const user = await identityService.updateProfile(c.env.DB, userId, input)
+    const user = await identityService.updateProfile(c.get('db'), userId, input)
     if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     return c.json({ data: user })
   } catch (e) {
@@ -43,7 +43,7 @@ export async function deleteProfileHandler(c: Context<AppEnv>): Promise<Response
   const userId = c.get('userId')!
   const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteMe(c.env.DB, userId, sysIds)
+    await identityService.deleteMe(c.get('db'), userId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {

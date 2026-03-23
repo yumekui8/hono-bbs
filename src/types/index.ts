@@ -105,32 +105,50 @@ export type Post = {
   posterName: string
   posterSubInfo: string | null
   content: string
+  isDeleted: boolean            // ソフト削除フラグ
   createdAt: string
   adminMeta: AdminMeta
 }
 
+import type { DbAdapter } from '../adapters/db'
+import type { KvAdapter } from '../adapters/kv'
+
+export type { DbAdapter, KvAdapter }
+
 export type AppEnv = {
   Bindings: {
-    DB: D1Database
-    SESSION_KV: KVNamespace       // ログインセッション・Turnstileセッション保存先
-    ENABLE_TURNSTILE: string | undefined    // 'true' のとき KV でTurnstileセッションを検証する
-    ADMIN_INITIAL_PASSWORD: string | undefined  // POST /auth/setup で使用
-    ADMIN_USERNAME: string | undefined      // 管理者ユーザID (デフォルト: admin)
-    USER_ADMIN_GROUP: string | undefined    // ユーザ管理グループID (デフォルト: user-admin-group)
-    BBS_ADMIN_GROUP: string | undefined     // 掲示板管理グループID (デフォルト: bbs-admin-group)
-    ENDPOINT_PERMISSIONS: string | undefined // エンドポイント権限JSON (省略時はデフォルト値を使用)
-    MAX_REQUEST_SIZE: string | undefined    // リクエストサイズ上限 例: "1mb", "500kb"
-    API_BASE_PATH: string      // e.g. "/api/v1"
-    CORS_ORIGIN: string | undefined  // 許可するオリジン カンマ区切り
-    BBS_ALLOW_DOMAIN: string | undefined      // 許可するドメイン カンマ区切り (未設定時は制限なし)
-    USER_DISPLAY_LIMIT: string | undefined  // ユーザ一覧ページネーション件数 (0=無制限)
-    GROUP_DISPLAY_LIMIT: string | undefined // グループ一覧ページネーション件数 (0=無制限)
+    // ── Cloudflare Workers ネイティブバインディング ──────────────
+    // Node.js 環境では不要 (src/index.node.ts でアダプターを直接生成する)
+    DB?: D1Database                // Cloudflare D1 (Workers のみ)
+    SESSION_KV?: KVNamespace       // Cloudflare KV (Workers のみ)
+    // ── 認証・セキュリティ ────────────────────────────────────────
+    ENABLE_TURNSTILE?: string      // 'true' のとき KV で Turnstile セッションを検証する
+    ADMIN_INITIAL_PASSWORD?: string // POST /auth/setup で使用
+    ADMIN_USERNAME?: string        // 管理者ユーザID (デフォルト: admin)
+    USER_ADMIN_GROUP?: string      // ユーザ管理グループID (デフォルト: user-admin-group)
+    BBS_ADMIN_GROUP?: string       // 掲示板管理グループID (デフォルト: bbs-admin-group)
+    // ── API 設定 ─────────────────────────────────────────────────
+    ENDPOINT_PERMISSIONS?: string  // エンドポイント権限JSON (省略時はデフォルト値を使用)
+    MAX_REQUEST_SIZE?: string      // リクエストサイズ上限 例: "1mb", "500kb"
+    API_BASE_PATH: string          // e.g. "/api/v1"
+    CORS_ORIGIN?: string           // 許可するオリジン カンマ区切り
+    BBS_ALLOW_DOMAIN?: string      // 許可するドメイン カンマ区切り (未設定時は制限なし)
+    USER_DISPLAY_LIMIT?: string    // ユーザ一覧ページネーション件数 (0=無制限)
+    GROUP_DISPLAY_LIMIT?: string   // グループ一覧ページネーション件数 (0=無制限)
+    // ── KV プレフィックス ─────────────────────────────────────────
+    // 複数インスタンスで同一 KV ネームスペース / Redis を共有する際のキー衝突防止
+    // 例: "prod:" → "prod:session:{id}", "prod:turnstile:{id}" のように付与される
+    KV_PREFIX?: string
   }
   Variables: {
-    userId: string | null           // セッションから取得したユーザID
-    isAdmin: boolean                // bbsAdminGroup メンバーかどうか
-    isUserAdmin: boolean            // userAdminGroup メンバーかどうか
-    userGroupIds: string[]          // ユーザが所属するグループID一覧
-    primaryGroupId: string | null   // ユーザのプライマリグループID
+    // セットアップミドルウェア (src/middleware/adapters.ts) が設定するアダプター
+    db: DbAdapter                  // DB アダプター (D1 / MySQL / PostgreSQL / SQLite)
+    kv: KvAdapter                  // KV アダプター (Cloudflare KV / Redis / Memory)
+    // 認証コンテキスト (src/middleware/auth.ts が設定)
+    userId: string | null          // セッションから取得したユーザID
+    isAdmin: boolean               // bbsAdminGroup メンバーかどうか
+    isUserAdmin: boolean           // userAdminGroup メンバーかどうか
+    userGroupIds: string[]         // ユーザが所属するグループID一覧
+    primaryGroupId: string | null  // ユーザのプライマリグループID
   }
 }

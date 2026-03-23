@@ -1,0 +1,67 @@
+{
+  // このファイルを wrangler.jsonc にコピーして使用してください
+  // cp wrangler.example.jsonc wrangler.jsonc
+
+  "name": "two-ch",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+
+  // hono-bbs 本体と同じ D1 データベースを共有する
+  // hono-bbs の wrangler.jsonc の d1_databases[].database_id と同じ値を設定すること
+  "d1_databases": [
+    {
+      "binding": "BBS_DB",
+      "database_name": "hono-bbs-db",
+      "database_id": "<SAME_DATABASE_ID_AS_HONO_BBS>"
+    }
+  ],
+
+  // Turnstile セッション保存先 KV
+  // hono-bbs 本体と同じ KV を使っても問題ない (プレフィックス "edge_token:" で区別される)
+  // 完全に分けたい場合は別の KV ネームスペース ID を指定すること
+  "kv_namespaces": [
+    {
+      "binding": "SESSION_KV",
+      "id": "<YOUR_KV_NAMESPACE_ID>"
+    }
+  ],
+
+  // 専用ドメインのルーティングを設定する
+  // hono-bbs 本体とは異なるドメインを使用すること
+  "routes": [
+    {
+      "pattern": "2ch.example.com/*",
+      "zone_name": "example.com"
+    }
+  ],
+
+  "vars": {
+    // このWorkerのベースURL (bbsmenu.html のリンク生成に使用)
+    // 2ch ブラウザはここで設定した URL に subject.txt / dat を取得しに行く
+    "SITE_URL": "https://2ch.example.com",
+
+    // 掲示板サイト名 (bbsmenu.html のタイトルに表示)
+    "BBS_NAME": "掲示板",
+
+    // 許可する CORS オリジン (カンマ区切り、未設定時は *)
+    // "CORS_ORIGIN": "https://app.example.com",
+
+    // 'true' にすると書き込み時に Turnstile 認証を必須とする (edge-token 方式)
+    // 認証ページは SITE_URL/auth/turnstile で自動生成される
+    // "ENABLE_TURNSTILE": "true",
+
+    // Turnstile サイトキー (公開値)
+    // "TURNSTILE_SITE_KEY": "<YOUR_TURNSTILE_SITE_KEY>",
+
+    // Turnstile シークレットキーは wrangler secret put で設定すること
+    // wrangler secret put TURNSTILE_SECRET_KEY
+
+    // 書き込み時の owner_user_id / owner_group_id
+    // hono-bbs の users.id / groups.id に存在する値を指定すること
+    // 未設定の場合は NULL (外部キー制約に注意)
+    // "THREAD_OWNER_USER": "sys-general-user",
+    // "THREAD_OWNER_GROUP": "sys-general-group",
+    // "POST_OWNER_USER": "sys-general-user",
+    // "POST_OWNER_GROUP": "sys-general-group"
+  }
+}

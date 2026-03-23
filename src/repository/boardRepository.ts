@@ -1,4 +1,5 @@
 import type { Board } from '../types'
+import type { DbAdapter } from '../adapters/db'
 
 type BoardRow = {
   id: string
@@ -58,21 +59,19 @@ function rowToBoard(row: BoardRow): Board {
   }
 }
 
-export async function findBoards(db: D1Database): Promise<Board[]> {
-  const result = await db
-    .prepare('SELECT * FROM boards ORDER BY created_at DESC')
-    .all<BoardRow>()
+export async function findBoards(db: DbAdapter): Promise<Board[]> {
+  const result = await db.all<BoardRow>('SELECT * FROM boards ORDER BY created_at DESC')
   return result.results.map(rowToBoard)
 }
 
-export async function findBoardById(db: D1Database, id: string): Promise<Board | null> {
-  const row = await db.prepare('SELECT * FROM boards WHERE id = ?').bind(id).first<BoardRow>()
+export async function findBoardById(db: DbAdapter, id: string): Promise<Board | null> {
+  const row = await db.first<BoardRow>('SELECT * FROM boards WHERE id = ?', [id])
   return row ? rowToBoard(row) : null
 }
 
-export async function insertBoard(db: D1Database, board: Board): Promise<void> {
-  await db
-    .prepare(`
+export async function insertBoard(db: DbAdapter, board: Board): Promise<void> {
+  await db.run(
+    `
       INSERT INTO boards (
         id, owner_user_id, owner_group_id, permissions, name, description,
         max_threads, max_thread_title_length,
@@ -82,8 +81,8 @@ export async function insertBoard(db: D1Database, board: Board): Promise<void> {
         default_thread_owner_user_id, default_thread_owner_group_id, default_thread_permissions,
         category, created_at, creator_user_id, creator_session_id, creator_turnstile_session_id
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `)
-    .bind(
+    `,
+    [
       board.id, board.ownerUserId, board.ownerGroupId, board.permissions,
       board.name, board.description,
       board.maxThreads, board.maxThreadTitleLength,
@@ -94,12 +93,12 @@ export async function insertBoard(db: D1Database, board: Board): Promise<void> {
       board.category,
       board.createdAt,
       board.adminMeta.creatorUserId, board.adminMeta.creatorSessionId, board.adminMeta.creatorTurnstileSessionId,
-    )
-    .run()
+    ],
+  )
 }
 
 export async function updateBoard(
-  db: D1Database,
+  db: DbAdapter,
   id: string,
   updates: {
     name?: string
@@ -132,14 +131,11 @@ export async function updateBoard(
 
   if (fields.length === 0) return true
   values.push(id)
-  const result = await db
-    .prepare(`UPDATE boards SET ${fields.join(', ')} WHERE id = ?`)
-    .bind(...values)
-    .run()
-  return result.meta.changes > 0
+  const result = await db.run(`UPDATE boards SET ${fields.join(', ')} WHERE id = ?`, values)
+  return result.changes > 0
 }
 
-export async function deleteBoard(db: D1Database, id: string): Promise<boolean> {
-  const result = await db.prepare('DELETE FROM boards WHERE id = ?').bind(id).run()
-  return result.meta.changes > 0
+export async function deleteBoard(db: DbAdapter, id: string): Promise<boolean> {
+  const result = await db.run('DELETE FROM boards WHERE id = ?', [id])
+  return result.changes > 0
 }

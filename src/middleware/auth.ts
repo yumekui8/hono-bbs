@@ -12,14 +12,14 @@ export const authContext: MiddlewareHandler<AppEnv> = async (c, next) => {
   const sessionId = c.req.header('X-Session-Id')
 
   if (sessionId) {
-    const session = await sessionRepository.findSessionById(c.env.SESSION_KV, sessionId)
+    const session = await sessionRepository.findSessionById(c.get('kv'), sessionId)
     if (session) {
       c.set('userId', session.userId)
-      const groupIds = await groupRepository.findGroupIdsByUserId(c.env.DB, session.userId)
+      const groupIds = await groupRepository.findGroupIdsByUserId(c.get('db'), session.userId)
       c.set('userGroupIds', groupIds)
       c.set('isAdmin',     groupIds.includes(sysIds.bbsAdminGroupId))
       c.set('isUserAdmin', groupIds.includes(sysIds.userAdminGroupId))
-      const user = await userRepository.findUserById(c.env.DB, session.userId)
+      const user = await userRepository.findUserById(c.get('db'), session.userId)
       c.set('primaryGroupId', user?.primaryGroupId ?? null)
       await next()
       return

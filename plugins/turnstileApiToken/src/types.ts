@@ -1,3 +1,7 @@
+import type { KvAdapter } from './adapters/kv'
+
+export type { KvAdapter }
+
 export type TurnstileSession = {
   id: string
   createdAt: string
@@ -16,5 +20,8 @@ export type PluginEnv = {
     ALLOW_BBS_UI_DOMAINS: string | undefined        // Turnstile認証後のリダイレクト許可UIドメイン (カンマ区切り)
     BBS_ALLOW_DOMAIN: string | undefined            // 許可ドメイン (カンマ区切り、未設定時は制限なし)
     CORS_ORIGIN: string | undefined                 // 許可するオリジン (カンマ区切り、未設定時は *)
+  }
+  Variables: {
+    kv: KvAdapter
   }
 }

@@ -12,6 +12,8 @@ function resolveRedirectTo(
     if (!url || allowedDomains.length === 0) return false
     try {
       const parsed = new URL(url)
+      // javascript: / data: 等の危険なスキームを明示的に拒否
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
       return allowedDomains.some(d => parsed.host === d || parsed.hostname === d)
     } catch {
       return false
@@ -87,7 +89,7 @@ export async function turnstilePageHandler(c: Context<PluginEnv>): Promise<Respo
       submitted = true;
       document.getElementById('status').textContent = '検証中...';
       try {
-        const res = await fetch(postEndpoint, {
+            const res = await fetch(postEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
@@ -142,10 +144,25 @@ export async function turnstilePageHandler(c: Context<PluginEnv>): Promise<Respo
 }
 
 // POST - Turnstile トークン検証 → セッションID発行
+// レスポンスに Set-Cookie: turnstile_session を付与する
+// 同一ドメインの 2ch 互換エンドポイントと routes を共有している場合、
+// このクッキーが bbs.cgi の書き込み認証に自動利用される
 export async function turnstileVerifyHandler(c: Context<PluginEnv>): Promise<Response> {
+  const { minutes: ttlMinutes, } = service.parseTurnstileTtl(c.env.TURNSTILE_TOKEN_TTL)
+  const maxAge = ttlMinutes === 0 ? 365 * 24 * 3600 : ttlMinutes * 60
+
   // 開発環境ではスキップ
   if (c.env.DISABLE_TURNSTILE === 'true') {
-    return c.json({ data: { sessionId: 'dev-turnstile-disabled', alreadyIssued: false } })
+    const devId = 'dev-turnstile-disabled'
+    return new Response(
+      JSON.stringify({ data: { sessionId: devId, alreadyIssued: false } }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `turnstile_session=${devId}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${maxAge}`,
+        },
+      },
+    )
   }
 
   const body = await c.req.json<{ token?: string }>()
@@ -158,9 +175,8 @@ export async function turnstileVerifyHandler(c: Context<PluginEnv>): Promise<Res
     ?? 'unknown'
   const userAgent = c.req.header('User-Agent') ?? 'unknown'
 
-  const { minutes: ttlMinutes } = service.parseTurnstileTtl(c.env.TURNSTILE_TOKEN_TTL)
   const result = await service.issueTurnstileSession(
-    c.env.SESSION_KV, body.token, c.env.TURNSTILE_SECRET_KEY, clientIP, userAgent, ttlMinutes,
+    c.get('kv'), body.token, c.env.TURNSTILE_SECRET_KEY, clientIP, userAgent, ttlMinutes,
   )
   if (!result.sessionId) {
     if (result.errorCodes?.includes('kv-write-failed')) {
@@ -169,5 +185,13 @@ export async function turnstileVerifyHandler(c: Context<PluginEnv>): Promise<Res
     return c.json({ error: 'TURNSTILE_FAILED', message: 'Turnstile verification failed', errorCodes: result.errorCodes }, 400)
   }
 
-  return c.json({ data: { sessionId: result.sessionId, alreadyIssued: result.alreadyIssued } })
+  return new Response(
+    JSON.stringify({ data: { sessionId: result.sessionId, alreadyIssued: result.alreadyIssued } }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `turnstile_session=${result.sessionId}; Path=/; SameSite=Lax; HttpOnly; Max-Age=${maxAge}`,
+      },
+    },
+  )
 }

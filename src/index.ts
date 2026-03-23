@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 import type { AppEnv } from './types'
 import { authContext } from './middleware/auth'
+import { setupAdapters } from './middleware/adapters'
 import { domainRestrict } from './middleware/domain'
 import { requestSizeLimit } from './middleware/requestSize'
 import auth from './routes/auth'
@@ -18,6 +19,8 @@ api.use(trimTrailingSlash())
 api.use('*', domainRestrict)
 // リクエストサイズ制限 (MAX_REQUEST_SIZE が設定されている場合のみ有効)
 api.use('*', requestSizeLimit)
+// アダプターセットアップ (DB / KV をコンテキストにセット)
+api.use('*', setupAdapters)
 // 全ルートに認証コンテキストを適用
 api.use('*', authContext)
 

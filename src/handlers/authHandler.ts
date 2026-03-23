@@ -37,7 +37,7 @@ export async function setupHandler(c: Context<AppEnv>): Promise<Response> {
   }
   const { adminUserId } = getSystemIds(c.env)
   try {
-    await authService.setup(c.env.DB, adminInitialPassword, adminUserId)
+    await authService.setup(c.get('db'), adminInitialPassword, adminUserId)
     return c.json({ data: { message: 'Admin password has been set' } })
   } catch (e) {
     if (e instanceof Error) {
@@ -57,12 +57,15 @@ export async function loginHandler(c: Context<AppEnv>): Promise<Response> {
   try {
     const body = await c.req.json()
     const input = authService.parseLogin(body)
-    const { user, session } = await authService.login(c.env.DB, c.env.SESSION_KV, input)
+    const { user, session } = await authService.login(c.get('db'), c.get('kv'), input)
     return c.json({ data: { sessionId: session.id, userId: user.id, displayName: user.displayName, expiresAt: session.expiresAt } })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'INVALID_CREDENTIALS') {
       return c.json({ error: 'INVALID_CREDENTIALS', message: 'Invalid username or password' }, 401)
+    }
+    if (e instanceof Error && e.message === 'TOO_MANY_ATTEMPTS') {
+      return c.json({ error: 'TOO_MANY_ATTEMPTS', message: 'Too many failed login attempts. Please try again later.' }, 429)
     }
     throw e
   }
@@ -74,6 +77,6 @@ export async function logoutHandler(c: Context<AppEnv>): Promise<Response> {
   if (!sessionId) {
     return c.json({ error: 'UNAUTHORIZED', message: 'X-Session-Id header required' }, 401)
   }
-  await authService.logout(c.env.SESSION_KV, sessionId)
+  await authService.logout(c.get('kv'), sessionId)
   return new Response(null, { status: 204 })
 }

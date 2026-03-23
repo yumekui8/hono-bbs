@@ -1,4 +1,5 @@
 import type { BbsRoot } from '../types'
+import type { DbAdapter } from '../adapters/db'
 
 type BbsRootRow = {
   id: string
@@ -15,15 +16,13 @@ function rowToBbsRoot(row: BbsRootRow): BbsRoot {
   }
 }
 
-export async function findBbsRoot(db: D1Database): Promise<BbsRoot | null> {
-  const row = await db
-    .prepare("SELECT * FROM bbs_root WHERE id = '__root__'")
-    .first<BbsRootRow>()
+export async function findBbsRoot(db: DbAdapter): Promise<BbsRoot | null> {
+  const row = await db.first<BbsRootRow>("SELECT * FROM bbs_root WHERE id = '__root__'")
   return row ? rowToBbsRoot(row) : null
 }
 
 export async function updateBbsRoot(
-  db: D1Database,
+  db: DbAdapter,
   updates: {
     ownerUserId?: string | null
     ownerGroupId?: string | null
@@ -38,9 +37,9 @@ export async function updateBbsRoot(
   if (updates.permissions !== undefined) { fields.push('permissions = ?'); values.push(updates.permissions) }
 
   if (fields.length === 0) return true
-  const result = await db
-    .prepare(`UPDATE bbs_root SET ${fields.join(', ')} WHERE id = '__root__'`)
-    .bind(...values)
-    .run()
-  return result.meta.changes > 0
+  const result = await db.run(
+    `UPDATE bbs_root SET ${fields.join(', ')} WHERE id = '__root__'`,
+    values,
+  )
+  return result.changes > 0
 }

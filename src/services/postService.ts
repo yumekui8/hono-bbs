@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Post } from '../types'
+import type { DbAdapter } from '../adapters/db'
 import * as postRepository from '../repository/postRepository'
 import * as threadRepository from '../repository/threadRepository'
 import * as boardRepository from '../repository/boardRepository'
@@ -29,7 +30,7 @@ export function parseUpdatePost(data: unknown): UpdatePostInput {
 }
 
 export async function getPostByNumber(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   postNumber: number,
@@ -53,7 +54,7 @@ export async function getPostByNumber(
 }
 
 export async function createPost(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   input: CreatePostInput,
@@ -117,9 +118,9 @@ export async function createPost(
   return post
 }
 
-// 投稿の更新 (ソフト削除=削除マーク書き込みにも使用)
+// 投稿の更新
 export async function updatePost(
-  db: D1Database,
+  db: DbAdapter,
   boardId: string,
   threadId: string,
   postNumber: number,
@@ -144,5 +145,34 @@ export async function updatePost(
   }
 
   await postRepository.updatePostContent(db, threadId, postNumber, input.content)
+  return postRepository.findPostByNumber(db, threadId, postNumber)
+}
+
+// 投稿のソフト削除
+export async function deletePost(
+  db: DbAdapter,
+  boardId: string,
+  threadId: string,
+  postNumber: number,
+  userId: string | null,
+  userGroupIds: string[],
+  isAdmin: boolean,
+): Promise<Post | null> {
+  const thread = await threadRepository.findThreadById(db, threadId)
+  if (!thread || thread.boardId !== boardId) return null
+
+  const post = await postRepository.findPostByNumber(db, threadId, postNumber)
+  if (!post) return null
+
+  // DELETE パーミッションチェック (post 自身のパーミッション)
+  if (!hasPermission({
+    userId, userGroupIds,
+    ownerUserId: post.ownerUserId, ownerGroupId: post.ownerGroupId,
+    permissions: post.permissions, operation: 'DELETE', isAdmin,
+  })) {
+    throw new Error('FORBIDDEN')
+  }
+
+  await postRepository.softDeletePost(db, threadId, postNumber)
   return postRepository.findPostByNumber(db, threadId, postNumber)
 }

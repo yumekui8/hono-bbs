@@ -17,12 +17,28 @@
 
   // デプロイ先のドメインとパスを設定する
   // TURNSTILE_PATH と routes のパスパターンを合わせること
+  //
+  // 【パターン A】Turnstile 専用ドメインのみ
+  // "routes": [
+  //   { "pattern": "turnstile.example.com/auth/turnstile", "zone_name": "example.com" }
+  // ],
+  //
+  // 【パターン B】2ch 互換エンドポイントと同一ドメインで cookie を共有する場合
+  // twoCh Worker は同ドメインの /* を担当するが、より具体的なパスが優先されるため
+  // /auth/turnstile はこの Worker が処理する。
+  // Set-Cookie は Path=/ で発行されるため bbs.cgi へのリクエストにも自動的に付与される。
   "routes": [
     {
-      "pattern": "example.com/auth/turnstile",
+      "pattern": "2ch.example.com/auth/turnstile",
       "zone_name": "example.com"
     }
   ],
+  //
+  // 【パターン C】専用ドメイン + 2ch ドメインの両方に配置する場合
+  // "routes": [
+  //   { "pattern": "turnstile.example.com/auth/turnstile", "zone_name": "example.com" },
+  //   { "pattern": "2ch.example.com/auth/turnstile",       "zone_name": "example.com" }
+  // ],
 
   "vars": {
     // Turnstile サイトキー (公開値、シークレットではない)

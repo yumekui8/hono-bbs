@@ -1,4 +1,5 @@
 import type { Thread, Post } from '../types'
+import type { DbAdapter } from '../adapters/db'
 
 type ThreadRow = {
   id: string
@@ -91,9 +92,9 @@ function rowToFirstPost(row: ThreadWithFirstPostRow): Post | null {
   }
 }
 
-export async function findThreadsByBoardId(db: D1Database, boardId: string): Promise<Thread[]> {
-  const result = await db
-    .prepare(`
+export async function findThreadsByBoardId(db: DbAdapter, boardId: string): Promise<Thread[]> {
+  const result = await db.all<ThreadWithFirstPostRow>(
+    `
       SELECT
         t.*,
         p.id AS p_id,
@@ -114,20 +115,20 @@ export async function findThreadsByBoardId(db: D1Database, boardId: string): Pro
       LEFT JOIN posts p ON p.thread_id = t.id AND p.post_number = 1
       WHERE t.board_id = ?
       ORDER BY t.updated_at DESC
-    `)
-    .bind(boardId)
-    .all<ThreadWithFirstPostRow>()
+    `,
+    [boardId],
+  )
   return result.results.map(row => ({ ...rowToThread(row), firstPost: rowToFirstPost(row) }))
 }
 
-export async function findThreadById(db: D1Database, id: string): Promise<Thread | null> {
-  const row = await db.prepare('SELECT * FROM threads WHERE id = ?').bind(id).first<ThreadRow>()
+export async function findThreadById(db: DbAdapter, id: string): Promise<Thread | null> {
+  const row = await db.first<ThreadRow>('SELECT * FROM threads WHERE id = ?', [id])
   return row ? rowToThread(row) : null
 }
 
-export async function insertThread(db: D1Database, thread: Thread): Promise<void> {
-  await db
-    .prepare(`
+export async function insertThread(db: DbAdapter, thread: Thread): Promise<void> {
+  await db.run(
+    `
       INSERT INTO threads (
         id, board_id, owner_user_id, owner_group_id, permissions, title,
         max_posts, max_post_length, max_post_lines,
@@ -135,27 +136,27 @@ export async function insertThread(db: D1Database, thread: Thread): Promise<void
         poster_name, id_format, post_count, created_at, updated_at,
         creator_user_id, creator_session_id, creator_turnstile_session_id
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `)
-    .bind(
+    `,
+    [
       thread.id, thread.boardId, thread.ownerUserId, thread.ownerGroupId, thread.permissions,
       thread.title,
       thread.maxPosts, thread.maxPostLength, thread.maxPostLines,
       thread.maxPosterNameLength, thread.maxPosterSubInfoLength, thread.maxPosterMetaInfoLength,
       thread.posterName, thread.idFormat, thread.postCount, thread.createdAt, thread.updatedAt,
       thread.adminMeta.creatorUserId, thread.adminMeta.creatorSessionId, thread.adminMeta.creatorTurnstileSessionId,
-    )
-    .run()
+    ],
+  )
 }
 
-export async function incrementPostCount(db: D1Database, threadId: string, updatedAt: string): Promise<void> {
-  await db
-    .prepare('UPDATE threads SET post_count = post_count + 1, updated_at = ? WHERE id = ?')
-    .bind(updatedAt, threadId)
-    .run()
+export async function incrementPostCount(db: DbAdapter, threadId: string, updatedAt: string): Promise<void> {
+  await db.run(
+    'UPDATE threads SET post_count = post_count + 1, updated_at = ? WHERE id = ?',
+    [updatedAt, threadId],
+  )
 }
 
 export async function updateThread(
-  db: D1Database,
+  db: DbAdapter,
   id: string,
   updates: {
     title?: string
@@ -176,14 +177,11 @@ export async function updateThread(
   fields.push('updated_at = ?')
   values.push(new Date().toISOString())
   values.push(id)
-  const result = await db
-    .prepare(`UPDATE threads SET ${fields.join(', ')} WHERE id = ?`)
-    .bind(...values)
-    .run()
-  return result.meta.changes > 0
+  const result = await db.run(`UPDATE threads SET ${fields.join(', ')} WHERE id = ?`, values)
+  return result.changes > 0
 }
 
-export async function deleteThread(db: D1Database, id: string): Promise<boolean> {
-  const result = await db.prepare('DELETE FROM threads WHERE id = ?').bind(id).run()
-  return result.meta.changes > 0
+export async function deleteThread(db: DbAdapter, id: string): Promise<boolean> {
+  const result = await db.run('DELETE FROM threads WHERE id = ?', [id])
+  return result.changes > 0
 }

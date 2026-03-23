@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { trimTrailingSlash } from 'hono/trailing-slash'
 import type { PluginEnv } from './types'
 import { turnstilePageHandler, turnstileVerifyHandler } from './handler'
+import { setupAdapters } from './adapters'
 
 // ドメイン制限ミドルウェア (BBS_ALLOW_DOMAIN が設定されている場合のみ有効)
 function domainRestrict(allowDomain: string | undefined, host: string): boolean {
@@ -56,8 +57,9 @@ export default {
       )
     }
 
-    const app = new Hono<{ Bindings: PluginEnv['Bindings'] }>()
+    const app = new Hono<PluginEnv>()
     app.use(trimTrailingSlash())
+    app.use('*', setupAdapters)
     app.get(mountPath, turnstilePageHandler)
     app.post(mountPath, turnstileVerifyHandler)
     app.onError((err, c) => {
