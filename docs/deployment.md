@@ -163,7 +163,11 @@ const db = new Database('./data/hono-bbs.db');
 db.exec(fs.readFileSync('./schema/init.sql', 'utf8'));
 "
 
-# MySQL / PostgreSQL: お使いの DB クライアントで schema/init.sql を実行してください
+# MySQL / MariaDB
+mysql -u user -p hono_bbs < schema/init.mysql.sql
+
+# PostgreSQL
+psql -U user -d hono_bbs -f schema/init.postgresql.sql
 ```
 
 #### 4. Node.js サーバーの起動
@@ -423,8 +427,12 @@ sudo systemctl start hono-bbs-twoch
 
 | ファイル | 内容 |
 |---|---|
-| `schema/init.sql` | 全テーブル作成 (初期構築用) |
-| `schema/migrate_add_is_deleted.sql` | posts テーブルに `is_deleted` カラムを追加 |
+| `schema/init.sql` | 全テーブル作成 (SQLite / Cloudflare D1 用) |
+| `schema/init.mysql.sql` | 全テーブル作成 (MySQL / MariaDB 用) |
+| `schema/init.postgresql.sql` | 全テーブル作成 (PostgreSQL 用) |
+| `schema/migrate_add_is_deleted.sql` | posts テーブルに `is_deleted` カラムを追加 (SQLite/D1/PostgreSQL) |
+| `schema/migrate_add_bbs_root.sql` | bbs_root テーブルを追加 (SQLite/D1/PostgreSQL 用) |
+| `schema/migrate_add_bbs_root.mysql.sql` | bbs_root テーブルを追加 (MySQL/MariaDB 用) |
 
 **Cloudflare D1:**
 

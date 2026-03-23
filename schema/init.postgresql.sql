@@ -1,14 +1,15 @@
--- 開発環境リセット用: 全テーブルを削除して再作成する
--- 使い方: wrangler d1 execute hono-bbs-db --local --file=schema/init.sql
+-- PostgreSQL 向け初期化スクリプト
+-- 使い方: psql -U user -d dbname -f schema/init.postgresql.sql
+--
+-- 注意: SQLite の INSERT OR IGNORE INTO → INSERT INTO ... ON CONFLICT DO NOTHING に変換
 
-DROP TABLE IF EXISTS posts;
-DROP TABLE IF EXISTS threads;
-DROP TABLE IF EXISTS boards;
-DROP TABLE IF EXISTS bbs_root;
-DROP TABLE IF EXISTS user_groups;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS groups;
--- sessions と turnstile_sessions は Cloudflare KV に移行済み (D1 では管理しない)
+DROP TABLE IF EXISTS posts CASCADE;
+DROP TABLE IF EXISTS threads CASCADE;
+DROP TABLE IF EXISTS boards CASCADE;
+DROP TABLE IF EXISTS bbs_root CASCADE;
+DROP TABLE IF EXISTS user_groups CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS groups CASCADE;
 
 -- bbs_root: 板作成権限を管理するルートオブジェクト (シングルトン, id='__root__' 固定)
 CREATE TABLE bbs_root (
@@ -17,9 +18,6 @@ CREATE TABLE bbs_root (
   owner_group_id TEXT,
   permissions TEXT NOT NULL DEFAULT '15,14,12,8'
 );
-
-INSERT INTO bbs_root (id, owner_user_id, owner_group_id, permissions) VALUES
-  ('__root__', NULL, 'bbs-admin-group', '15,14,12,8');
 
 -- groups を先に作成 (users が FK で参照するため)
 CREATE TABLE groups (
@@ -120,7 +118,7 @@ CREATE TABLE posts (
   poster_name TEXT NOT NULL,
   poster_sub_info TEXT,
   content TEXT NOT NULL,
-  is_deleted INTEGER NOT NULL DEFAULT 0,            -- ソフト削除フラグ (1=削除済み)
+  is_deleted INTEGER NOT NULL DEFAULT 0,        -- ソフト削除フラグ (1=削除済み)
   created_at TEXT NOT NULL,
   creator_user_id TEXT,
   creator_session_id TEXT,
@@ -128,6 +126,10 @@ CREATE TABLE posts (
   FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- bbs_root 初期データ
+INSERT INTO bbs_root (id, owner_user_id, owner_group_id, permissions) VALUES
+  ('__root__', NULL, 'bbs-admin-group', '15,14,12,8');
 
 -- システムグループ
 -- ADMIN_USERNAME 環境変数でカスタマイズ可能 (デフォルト: admin)

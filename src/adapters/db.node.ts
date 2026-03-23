@@ -27,11 +27,13 @@ function toMysqlSql(sql: string): string {
 }
 
 function toPgSqlCompat(sql: string): string {
-  const pg = toPgSql(sql)
-  return pg.replace(/INSERT\s+OR\s+IGNORE\s+INTO/gi, 'INSERT INTO').replace(
-    /(INSERT INTO\s+\S+\s*\([^)]+\)\s*VALUES\s*\([^)]+\))/gi,
-    '$1 ON CONFLICT DO NOTHING',
+  // INSERT OR IGNORE INTO table (cols) VALUES (vals) → INSERT INTO table (cols) VALUES (vals) ON CONFLICT DO NOTHING
+  // 先に OR IGNORE を変換してから ? → $N に変換する
+  const noIgnore = sql.replace(
+    /INSERT\s+OR\s+IGNORE\s+INTO(\s+\S+\s*\([^)]*\)\s*VALUES\s*\([^)]*\))/gi,
+    'INSERT INTO$1 ON CONFLICT DO NOTHING',
   )
+  return toPgSql(noIgnore)
 }
 
 // MySQL2 プール (mysql2/promise の Pool) を DbAdapter にラップする
