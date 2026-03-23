@@ -15,7 +15,7 @@
 		// BBS_ADMIN_GROUP:        掲示板管理グループID         (デフォルト: bbs-admin-group)
 		// TURNSTILE_SITE_KEY:     Cloudflare Turnstile サイトキー
 		// TURNSTILE_SECRET_KEY:   Cloudflare Turnstile シークレットキー
-		// DISABLE_TURNSTILE:      'true' で検証をスキップ      (開発用のみ)
+		// ENABLE_TURNSTILE:       'true' で Turnstile 検証を有効化 (デフォルト: 無効)
 		// ADMIN_INITIAL_PASSWORD: admin 初期パスワード         (POST /auth/setup で使用)
 		// TURNSTILE_TOKEN_TTL:    Turnstile セッション有効期限  (分単位, 0=無期限, デフォルト: 525600=1年)
 		// ENDPOINT_PERMISSIONS:   エンドポイント権限 JSON       (省略時はデフォルト値を使用)

@@ -130,6 +130,8 @@ export type AppEnv = {
     // ── API 設定 ─────────────────────────────────────────────────
     ENDPOINT_PERMISSIONS?: string  // エンドポイント権限JSON (省略時はデフォルト値を使用)
     MAX_REQUEST_SIZE?: string      // リクエストサイズ上限 例: "1mb", "500kb"
+    DELETED_POSTER_NAME?: string   // ソフトデリート済み投稿の名前欄 (デフォルト: あぼーん)
+    DELETED_CONTENT?: string       // ソフトデリート済み投稿の本文 (デフォルト: このレスは削除されました)
     API_BASE_PATH: string          // e.g. "/api/v1"
     CORS_ORIGIN?: string           // 許可するオリジン カンマ区切り
     BBS_ALLOW_DOMAIN?: string      // 許可するドメイン カンマ区切り (未設定時は制限なし)

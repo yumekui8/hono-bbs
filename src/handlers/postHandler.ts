@@ -8,13 +8,13 @@ function adminVisible(c: Context<AppEnv>): boolean {
 }
 
 // 削除済み投稿のコンテンツをマスク (poster_name / content を置換)
-function maskDeletedPost(post: Post): Post {
+function maskDeletedPost(post: Post, deletedPosterName: string, deletedContent: string): Post {
   if (!post.isDeleted) return post
-  return { ...post, posterName: 'あぼーん', posterSubInfo: null, content: 'このレスは削除されました' }
+  return { ...post, posterName: deletedPosterName, posterSubInfo: null, content: deletedContent }
 }
 
-function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
-  const masked = maskDeletedPost(post)
+function stripPost(post: Post, visible: boolean, deletedPosterName: string, deletedContent: string): Post | Omit<Post, 'adminMeta'> {
+  const masked = maskDeletedPost(post, deletedPosterName, deletedContent)
   if (visible) return masked
   const { adminMeta: _dropped, ...rest } = masked
   return rest
@@ -33,7 +33,9 @@ export async function getPostHandler(c: Context<AppEnv>): Promise<Response> {
     c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
   )
   if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-  return c.json({ data: stripPost(post, adminVisible(c)) })
+  const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
+  const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+  return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
 }
 
 // POST /boards/:boardId/:threadId - 投稿作成
@@ -49,7 +51,9 @@ export async function createPostHandler(c: Context<AppEnv>): Promise<Response> {
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
-    return c.json({ data: stripPost(post, adminVisible(c)) }, 201)
+    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
+    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error) {
@@ -77,7 +81,9 @@ export async function deletePostHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    return c.json({ data: stripPost(post, adminVisible(c)) })
+    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
+    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
   } catch (e) {
     if (e instanceof Error && e.message === 'FORBIDDEN') {
       return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
@@ -102,7 +108,9 @@ export async function updatePostHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
     )
     if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    return c.json({ data: stripPost(post, adminVisible(c)) })
+    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
+    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'FORBIDDEN') {

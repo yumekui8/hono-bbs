@@ -114,6 +114,8 @@ async function main() {
         USER_DISPLAY_LIMIT:      process.env.USER_DISPLAY_LIMIT,
         GROUP_DISPLAY_LIMIT:     process.env.GROUP_DISPLAY_LIMIT,
         KV_PREFIX:               process.env.KV_PREFIX,
+        DELETED_POSTER_NAME:     process.env.DELETED_POSTER_NAME,
+        DELETED_CONTENT:         process.env.DELETED_CONTENT,
       }
 
       const response = await api.fetch(new Request(url.toString(), request), env)

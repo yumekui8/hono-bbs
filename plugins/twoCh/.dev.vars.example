@@ -1,0 +1,50 @@
+# このファイルをコピーして .dev.vars を作成してください
+# cp .dev.vars.example .dev.vars
+#
+# 注意: BBS_DB (D1) と SESSION_KV (KV) は wrangler.jsonc で設定します
+
+# ────────────────────────────────────────────────────────────
+# サイト設定
+# ────────────────────────────────────────────────────────────
+
+# このWorkerのベースURL (bbsmenu.html のリンク生成に使用)
+# 2ch ブラウザはここで設定した URL に subject.txt / dat を取得しに行く
+# SITE_URL=http://localhost:8789
+
+# 掲示板サイト名 (bbsmenu.html のタイトルに表示)
+# BBS_NAME=掲示板
+
+# ────────────────────────────────────────────────────────────
+# Turnstile 設定
+# ────────────────────────────────────────────────────────────
+
+# 'true' にすると書き込み時に Turnstile 認証を必須とする
+# ローカル開発時は未設定推奨
+# ENABLE_TURNSTILE=true
+
+# Cloudflare Turnstile サイトキー (公開値、ENABLE_TURNSTILE=true 時に使用)
+# TURNSTILE_SITE_KEY=your-site-key
+
+# Cloudflare Turnstile シークレットキー (ENABLE_TURNSTILE=true 時に使用)
+# 本番環境は wrangler secret put TURNSTILE_SECRET_KEY で設定することを推奨
+# TURNSTILE_SECRET_KEY=your-secret-key
+
+# ────────────────────────────────────────────────────────────
+# 投稿者 owner 設定
+# ────────────────────────────────────────────────────────────
+
+# スレッド・投稿作成時の owner_group_id
+# hono-bbs の groups.id に存在する値を指定すること (init.sql のデフォルト: general-group)
+# 未設定の場合は NULL (投稿に対するアクセス制御が不要な場合は未設定で可)
+# THREAD_OWNER_GROUP=general-group
+# POST_OWNER_GROUP=general-group
+
+# ────────────────────────────────────────────────────────────
+# その他
+# ────────────────────────────────────────────────────────────
+
+# 許可する CORS オリジン (カンマ区切りで複数指定可、未設定時は *)
+# CORS_ORIGIN=http://localhost:5173
+
+# KV グローバルプレフィックス (hono-bbs 本体と KV を共有する場合に合わせること)
+# KV_PREFIX=

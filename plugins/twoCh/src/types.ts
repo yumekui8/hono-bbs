@@ -43,6 +43,12 @@ export type BoardRow = {
   category: string | null
   default_poster_name: string
   default_thread_permissions: string
+  // SETTING.TXT 用フィールド
+  max_thread_title_length: number
+  default_max_post_lines: number
+  default_max_poster_name_length: number
+  default_max_poster_sub_info_length: number
+  default_max_post_length: number
 }
 
 export type ThreadRow = {
@@ -61,4 +67,5 @@ export type PostRow = {
   display_user_id: string
   content: string
   created_at: string
+  is_deleted: number  // 1=削除済み
 }

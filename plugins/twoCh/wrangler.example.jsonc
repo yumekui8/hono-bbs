@@ -58,10 +58,9 @@
 
     // 書き込み時の owner_user_id / owner_group_id
     // hono-bbs の users.id / groups.id に存在する値を指定すること
-    // 未設定の場合は NULL (外部キー制約に注意)
-    // "THREAD_OWNER_USER": "sys-general-user",
-    // "THREAD_OWNER_GROUP": "sys-general-group",
-    // "POST_OWNER_USER": "sys-general-user",
-    // "POST_OWNER_GROUP": "sys-general-group"
+    // 未設定の場合は NULL
+    // ※ init.sql のデフォルトグループは "general-group"
+    // "THREAD_OWNER_GROUP": "general-group",
+    // "POST_OWNER_GROUP": "general-group"
   }
 }
