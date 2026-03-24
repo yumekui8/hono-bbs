@@ -4,7 +4,7 @@
 
 ## 概要
 
-投稿 (Post) の作成・取得・ソフトデリートを行う。
+投稿 (Post) の作成・取得・更新・ソフトデリートを行う。
 
 ### 役割・実装の説明
 
@@ -12,7 +12,9 @@
 投稿番号 (`postNumber`) はスレッド内で 1 始まりの連番。
 
 投稿には「ハード削除」がなく、「ソフトデリート」のみ存在する。
-ソフトデリートは PUT で content を削除マーカー文字列に書き換える実装。
+ソフトデリートは `DELETE` で `isDeleted` フラグを立てる実装。ソフトデリートされた投稿は
+`posterName` / `posterSubInfo` / `content` が環境変数 (`DELETED_POSTER_NAME` / `DELETED_CONTENT`) で設定した文字列に置き換えられてレスポンスに含まれる。
+`PUT` は content の内容更新に使用する。
 
 `displayUserId` は板の `defaultIdFormat` (スレッドが上書き可能) に従って計算される匿名/表示用ID。
 
@@ -36,6 +38,7 @@
     "posterName":    { "type": "string" },
     "posterSubInfo": { "type": ["string", "null"] },
     "content":       { "type": "string" },
+    "isDeleted":     { "type": "boolean", "description": "ソフトデリート済みの場合 true。name/content はマスクされる" },
     "createdAt":     { "type": "string", "format": "date-time" },
     "adminMeta": {
       "type": "object",
@@ -164,8 +167,47 @@
 
 ## `PUT /boards/:boardId/:threadId/:responseNumber`
 
-投稿をソフトデリートする。content が削除マーカー文字列に置き換えられる。
-投稿の PUT 権限が必要。ハード削除は存在しない。
+投稿の本文 (content) を更新する。投稿の PUT 権限が必要。
+
+### 認証
+
+- `X-Turnstile-Session` 必須
+- `X-Session-Id` — 権限によっては必要
+
+### リクエスト
+
+```json
+{
+  "type": "object",
+  "required": ["content"],
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "1文字以上"
+    }
+  }
+}
+```
+
+### レスポンス
+
+- `200 OK` — 更新後の `Post` オブジェクト
+
+### エラー
+
+| コード | HTTP | 説明 |
+|---|---|---|
+| `VALIDATION_ERROR` | 400 | responseNumber が不正またはボディが不正 |
+| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
+| `FORBIDDEN` | 403 | 権限不足 |
+| `POST_NOT_FOUND` | 404 | 投稿が存在しない |
+
+---
+
+## `DELETE /boards/:boardId/:threadId/:responseNumber`
+
+投稿をソフトデリートする。`isDeleted` フラグが立ち、以後のレスポンスで name/content がマスクされる。
+投稿の DELETE 権限が必要。ハード削除は存在しない。
 
 ### 認証
 
@@ -178,7 +220,7 @@
 
 ### レスポンス
 
-- `200 OK` — 更新後の `Post` オブジェクト (content が削除マーカーに置き換えられる)
+- `200 OK` — ソフトデリート後の `Post` オブジェクト (posterName/content がマスク済み)
 
 ### エラー
 

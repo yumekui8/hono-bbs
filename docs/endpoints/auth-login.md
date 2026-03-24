@@ -84,3 +84,4 @@ Turnstile セッション (`X-Turnstile-Session`) が必要なため、
 | `VALIDATION_ERROR` | 400 | バリデーション失敗 |
 | `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
 | `INVALID_CREDENTIALS` | 401 | ID またはパスワードが誤り、またはアカウントが無効 |
+| `TOO_MANY_ATTEMPTS` | 429 | 短時間にログイン失敗が多すぎる (15分間で10回失敗でロック) |

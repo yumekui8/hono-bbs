@@ -90,7 +90,7 @@
 |---|---|---|
 | [boards.md](./boards.md) | `GET/POST /boards`, `PUT/DELETE /boards/:boardId` | 板の一覧・作成・更新・削除 |
 | [threads.md](./threads.md) | `GET/POST /boards/:boardId`, `GET/PUT/DELETE /boards/:boardId/:threadId` | スレッドの一覧・作成・更新・削除 |
-| [posts.md](./posts.md) | `POST/GET/PUT /boards/:boardId/:threadId/*` | 投稿の作成・取得・ソフトデリート |
+| [posts.md](./posts.md) | `POST/GET/PUT/DELETE /boards/:boardId/:threadId/*` | 投稿の作成・取得・更新・ソフトデリート |
 
 ---
 
@@ -124,6 +124,8 @@
 | `BBS_ALLOW_DOMAIN` | 許可するドメイン (カンマ区切り、未設定で制限なし) | — |
 | `USER_DISPLAY_LIMIT` | ユーザ一覧の1ページあたり件数 (0=無制限) | `0` |
 | `GROUP_DISPLAY_LIMIT` | グループ一覧の1ページあたり件数 (0=無制限) | `0` |
+| `DELETED_POSTER_NAME` | ソフトデリート済み投稿の名前欄マスク文字列 | `あぼーん` |
+| `DELETED_CONTENT` | ソフトデリート済み投稿の本文マスク文字列 | `このレスは削除されました` |
 
 > **Turnstile 関連の設定** (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_TOKEN_TTL`, `ALLOW_BBS_UI_DOMAINS`) は **turnstileApiToken プラグイン** 側の設定です。
 > hono-bbs 本体が参照するのは `ENABLE_TURNSTILE` と `SESSION_KV` のみです。
