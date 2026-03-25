@@ -31,9 +31,9 @@
     // 例: "" (未設定) → POST /admin/datimport
     // "BASE_PATH": "/dat",
 
-    // 掲示板管理者グループ ID (hono-bbs の BBS_ADMIN_GROUP と同じ値にすること)
-    // デフォルト: "bbs-admin-group"
-    // "BBS_ADMIN_GROUP": "bbs-admin-group",
+    // 掲示板管理者ロール ID (hono-bbs の ADMIN_ROLE と同じ値にすること)
+    // デフォルト: "admin-role"
+    // "ADMIN_ROLE": "admin-role",
 
     // 許可する CORS オリジン (カンマ区切り、未設定時は *)
     // "CORS_ORIGIN": "https://app.example.com"

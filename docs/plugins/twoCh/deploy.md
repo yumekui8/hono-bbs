@@ -216,10 +216,6 @@ print(resp.text)
 | `CORS_ORIGIN` | | `*` | 許可する CORS オリジン (カンマ区切りで複数指定可) |
 | `ENABLE_TURNSTILE` | | `false` | `"true"` にすると書き込み時に Turnstile 認証を必須とする |
 | `TURNSTILE_FQDN` | | | Turnstile 認証ページの URL。`turnstileApiToken` プラグインのデプロイ先 |
-| `THREAD_OWNER_USER` | | `null` | スレッド作成時の `owner_user_id`。hono-bbs の `users.id` に存在する値を指定 |
-| `THREAD_OWNER_GROUP` | | `null` | スレッド作成時の `owner_group_id`。hono-bbs の `groups.id` に存在する値を指定 |
-| `POST_OWNER_USER` | | `null` | 投稿作成時の `owner_user_id`。hono-bbs の `users.id` に存在する値を指定 |
-| `POST_OWNER_GROUP` | | `null` | 投稿作成時の `owner_group_id`。hono-bbs の `groups.id` に存在する値を指定 |
 | `KV_PREFIX` | | *(なし)* | KV グローバルプレフィックス。hono-bbs 本体と KV を共有する場合にキー衝突を防ぐ (例: `prod:`) |
 
 ---

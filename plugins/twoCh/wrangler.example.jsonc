@@ -56,11 +56,8 @@
     // Turnstile シークレットキーは wrangler secret put で設定すること
     // wrangler secret put TURNSTILE_SECRET_KEY
 
-    // 書き込み時の owner_user_id / owner_group_id
-    // hono-bbs の users.id / groups.id に存在する値を指定すること
-    // 未設定の場合は NULL
-    // ※ init.sql のデフォルトグループは "general-group"
-    // "THREAD_OWNER_GROUP": "general-group",
-    // "POST_OWNER_GROUP": "general-group"
+    // KV グローバルプレフィックス (hono-bbs 本体と KV を共有する場合)
+    // hono-bbs 本体の KV_PREFIX と同じ値を設定すること
+    // "KV_PREFIX": "prod:"
   }
 }

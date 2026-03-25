@@ -221,10 +221,6 @@ async function main() {
         ENABLE_TURNSTILE: process.env.ENABLE_TURNSTILE,
         TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY,
         TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
-        THREAD_OWNER_USER: process.env.THREAD_OWNER_USER,
-        THREAD_OWNER_GROUP: process.env.THREAD_OWNER_GROUP,
-        POST_OWNER_USER: process.env.POST_OWNER_USER,
-        POST_OWNER_GROUP: process.env.POST_OWNER_GROUP,
         KV_PREFIX: process.env.KV_PREFIX,
       }
 
