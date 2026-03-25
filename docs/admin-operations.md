@@ -276,7 +276,7 @@ curl -X PATCH <API_BASE>/boards/general \
 | `creatorSessionId` | 作成時のログインセッションID |
 | `creatorTurnstileSessionId` | 作成時の Turnstile セッションID |
 
-Turnstile セッションIDは KV に保存されます (有効期限は `TURNSTILE_TOKEN_TTL` 環境変数で設定可能、デフォルト 1 年)。
+Turnstile セッションIDは KV に保存されます (有効期限は turnstileApiToken プラグインの `TURNSTILE_TOKEN_TTL` 環境変数で設定可能、デフォルト 1 年)。
 期限切れ後は照合できません。問題のある投稿があった場合は速やかに確認することを推奨します。
 
 ---

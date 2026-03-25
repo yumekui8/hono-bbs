@@ -55,6 +55,7 @@
 ## `PUT /profile`
 
 ログイン中のユーザ自身のプロフィールを更新する。`id` と `isActive` は変更不可。
+**パスワード変更も同じエンドポイントで行う。** `currentPassword` と `newPassword` を両方指定すると変更される。
 
 ### 認証
 
@@ -67,12 +68,16 @@
 {
   "type": "object",
   "properties": {
-    "displayName": { "type": "string",           "description": "0〜128文字" },
-    "bio":         { "type": ["string", "null"],  "description": "0〜500文字。null で削除" },
-    "email":       { "type": ["string", "null"],  "description": "メールアドレス形式。null で削除" }
+    "displayName":    { "type": "string",           "description": "0〜128文字" },
+    "bio":            { "type": ["string", "null"],  "description": "0〜500文字。null で削除" },
+    "email":          { "type": ["string", "null"],  "description": "メールアドレス形式。null で削除" },
+    "currentPassword": { "type": "string",           "description": "パスワード変更時のみ。現在のパスワード" },
+    "newPassword":    { "type": "string",            "description": "パスワード変更時のみ。8〜128文字" }
   }
 }
 ```
+
+> `currentPassword` と `newPassword` はどちらか一方だけの指定は不可。両方指定するとパスワードが変更される。
 
 ### レスポンス
 
@@ -82,43 +87,7 @@
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
-| `UNAUTHORIZED` | 401 | 未ログイン / Turnstile セッション無効 |
-| `USER_NOT_FOUND` | 404 | ユーザが存在しない |
-
----
-
-## `PUT /profile/password`
-
-ログイン中のユーザのパスワードを変更する。現在のパスワードによる確認が必要。
-
-### 認証
-
-- `X-Session-Id` 必須
-- `X-Turnstile-Session` 必須
-
-### リクエスト
-
-```json
-{
-  "type": "object",
-  "required": ["currentPassword", "newPassword"],
-  "properties": {
-    "currentPassword": { "type": "string", "description": "現在のパスワード" },
-    "newPassword":     { "type": "string", "minLength": 8, "maxLength": 128, "description": "新しいパスワード" }
-  }
-}
-```
-
-### レスポンス
-
-- `204 No Content`
-
-### エラー
-
-| コード | HTTP | 説明 |
-|---|---|---|
-| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 / currentPassword と newPassword の片方のみ指定 |
 | `INVALID_PASSWORD` | 400 | currentPassword が正しくない |
 | `UNAUTHORIZED` | 401 | 未ログイン / Turnstile セッション無効 |
 | `USER_NOT_FOUND` | 404 | ユーザが存在しない |

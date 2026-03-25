@@ -439,8 +439,6 @@ sudo systemctl start hono-bbs-twoch
 | `schema/init.mysql.sql` | 全テーブル作成 (MySQL / MariaDB 用) |
 | `schema/init.postgresql.sql` | 全テーブル作成 (PostgreSQL 用) |
 | `schema/migrate_add_is_deleted.sql` | posts テーブルに `is_deleted` カラムを追加 (SQLite/D1/PostgreSQL) |
-| `schema/migrate_add_bbs_root.sql` | bbs_root テーブルを追加 (SQLite/D1/PostgreSQL 用) |
-| `schema/migrate_add_bbs_root.mysql.sql` | bbs_root テーブルを追加 (MySQL/MariaDB 用) |
 
 **Cloudflare D1:**
 
