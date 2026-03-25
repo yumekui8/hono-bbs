@@ -59,7 +59,7 @@ cp .dev.vars.example .dev.vars
 ```ini
 API_BASE_PATH=/api/v1
 ADMIN_INITIAL_PASSWORD=your-local-password
-DISABLE_TURNSTILE=true
+# ENABLE_TURNSTILE は設定しない (ローカル開発時は Turnstile スキップ)
 ```
 
 ### 5. ローカル D1 の初期化
@@ -138,13 +138,13 @@ cp wrangler.example.jsonc wrangler.jsonc
 "d1_databases": [{ "binding": "DB", "database_name": "hono-bbs-db", "database_id": "<取得したD1 ID>" }]
 ```
 
-必要に応じて `vars` に `CORS_ORIGIN` や `ALLOW_BBS_UI_DOMAINS` を追加します:
+必要に応じて `vars` に `CORS_ORIGIN` などを追加します:
 
 ```jsonc
 "vars": {
   "API_BASE_PATH": "/api/v1",
   "CORS_ORIGIN": "https://your-frontend.pages.dev",
-  "ALLOW_BBS_UI_DOMAINS": "your-frontend.pages.dev"
+  "ENABLE_TURNSTILE": "true"
 }
 ```
 
@@ -155,15 +155,9 @@ cp wrangler.example.jsonc wrangler.jsonc
 ```bash
 # admin 初期パスワード (8文字以上推奨)
 npx wrangler secret put ADMIN_INITIAL_PASSWORD
-
-# Cloudflare Turnstile シークレットキー
-npx wrangler secret put TURNSTILE_SECRET_KEY
-
-# Turnstile サイトキー (非機密、vars に書いても可)
-npx wrangler secret put TURNSTILE_SITE_KEY
 ```
 
-> **注意**: `DISABLE_TURNSTILE=true` は **本番環境では絶対に設定しないこと**。
+> **注意**: Turnstile の設定 (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`) は **turnstileApiToken プラグイン** 側で行います。hono-bbs 本体は `ENABLE_TURNSTILE=true` を設定するだけで連携できます。
 
 ### 4. D1 データベースの初期化
 
@@ -206,31 +200,21 @@ npx wrangler secret delete ADMIN_INITIAL_PASSWORD
 
 | 変数名 | 必須 | 説明 | デフォルト |
 |---|---|---|---|
-| `ADMIN_INITIAL_PASSWORD` | ✓ | admin 初期パスワード (`POST /auth/setup` で使用) | — |
-| `TURNSTILE_SECRET_KEY` | ✓ | Cloudflare Turnstile シークレットキー | — |
-| `TURNSTILE_SITE_KEY` | ✓ | Cloudflare Turnstile サイトキー (HTML ページで使用) | — |
+| `ADMIN_INITIAL_PASSWORD` | ✓ | admin 初期パスワード (`POST /auth/setup` で使用、設定後は削除推奨) | — |
 | `API_BASE_PATH` | — | API ベースパス | `/api/v1` |
 | `CORS_ORIGIN` | — | 許可する CORS オリジン (カンマ区切り) | `*` |
 | `BBS_ALLOW_DOMAIN` | — | 許可するドメイン — Host ヘッダーチェック (カンマ区切り) | 制限なし |
-| `ALLOW_BBS_UI_DOMAINS` | — | Turnstile 認証後リダイレクト先として許可するドメイン (カンマ区切り) | リダイレクトなし |
-| `TURNSTILE_TOKEN_TTL` | — | Turnstile セッション有効期限 (分単位、`0` = 無期限) | `525600` (1年) |
-| `DISABLE_TURNSTILE` | — | `true` で Turnstile 検証をスキップ (**開発用のみ**) | — |
+| `ENABLE_TURNSTILE` | — | `true` で `X-Turnstile-Session` を SESSION_KV で検証する | — (スキップ) |
 | `ADMIN_USERNAME` | — | admin ユーザーID | `admin` |
-| `USER_ADMIN_GROUP` | — | ユーザー管理者グループID | `user-admin-group` |
-| `BBS_ADMIN_GROUP` | — | 掲示板管理者グループID | `bbs-admin-group` |
+| `USER_ADMIN_ROLE` | — | ユーザー管理ロールID | `user-admin-role` |
 | `USER_DISPLAY_LIMIT` | — | ユーザー一覧の 1 ページあたり件数 (`0` = 無制限) | `0` |
-| `GROUP_DISPLAY_LIMIT` | — | グループ一覧の 1 ページあたり件数 (`0` = 無制限) | `0` |
-| `ENDPOINT_PERMISSIONS` | — | エンドポイント権限 JSON | (デフォルト値) |
+| `ROLE_DISPLAY_LIMIT` | — | ロール一覧の 1 ページあたり件数 (`0` = 無制限) | `0` |
 | `MAX_REQUEST_SIZE` | — | リクエストボディサイズ上限 (例: `"1mb"`, `"500kb"`) | 無制限 |
+| `DELETED_POSTER_NAME` | — | ソフトデリート済み投稿の名前欄 | `あぼーん` |
+| `DELETED_CONTENT` | — | ソフトデリート済み投稿の本文 | `このレスは削除されました` |
+| `KV_PREFIX` | — | KV グローバルプレフィックス (複数インスタンス共存時) | — |
 
-### Cloudflare Turnstile のテスト用キー
-
-常に成功するテスト用キーです (本番では使用しないこと):
-
-| 用途 | キー |
-|---|---|
-| サイトキー | `1x00000000000000000000AA` |
-| シークレットキー | `1x0000000000000000000000000000000AA` |
+> Turnstile 関連の設定 (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` 等) は **turnstileApiToken プラグイン** 側の設定です。詳細は [`docs/env-vars.md`](./docs/env-vars.md) を参照してください。
 
 ---
 
@@ -244,8 +228,9 @@ curl -X POST <API_BASE>/auth/login \
   -H "Content-Type: application/json" \
   -d '{"id":"admin","password":"<ADMIN_INITIAL_PASSWORD>"}'
 
-# 2. Turnstile セッションを取得 (または DISABLE_TURNSTILE=true で開発中はスキップ)
-# GET <API_BASE>/auth/turnstile でページを開き、チャレンジを通過してセッションIDを取得
+# 2. Turnstile セッションを取得 (ENABLE_TURNSTILE=true の場合)
+# turnstileApiToken プラグインの GET /auth/turnstile でページを開き、チャレンジを通過してセッションIDを取得
+# ENABLE_TURNSTILE を設定していない開発環境では X-Turnstile-Session は不要
 
 # 3. 板を作成
 curl -X POST <API_BASE>/boards \
@@ -265,9 +250,8 @@ curl -X POST <API_BASE>/boards \
 - [ ] `wrangler.jsonc` に D1 の `database_id` を設定した
 - [ ] `wrangler.jsonc` に KV の `id` を設定した
 - [ ] `ADMIN_INITIAL_PASSWORD` を Secret として登録した
-- [ ] `TURNSTILE_SECRET_KEY` を Secret として登録した
-- [ ] `TURNSTILE_SITE_KEY` を設定した
-- [ ] `DISABLE_TURNSTILE` が **設定されていない** ことを確認した
+- [ ] `ENABLE_TURNSTILE=true` を vars に設定した (Turnstile を使用する場合)
+- [ ] turnstileApiToken プラグインに `TURNSTILE_SECRET_KEY` / `TURNSTILE_SITE_KEY` を設定した (Turnstile を使用する場合)
 - [ ] `npx wrangler d1 execute hono-bbs-db --remote --file=schema/init.sql` を実行した
 - [ ] `npx wrangler deploy` を実行した
 - [ ] `POST /auth/setup` を実行して admin パスワードを設定した

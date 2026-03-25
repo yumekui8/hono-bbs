@@ -21,11 +21,8 @@ ADMIN_INITIAL_PASSWORD=password
 # 管理者ユーザID (デフォルト: admin)
 # ADMIN_USERNAME=admin
 
-# ユーザ管理グループID (デフォルト: user-admin-group)
-# USER_ADMIN_GROUP=user-admin-group
-
-# 掲示板管理グループID (デフォルト: bbs-admin-group)
-# BBS_ADMIN_GROUP=bbs-admin-group
+# ユーザ管理ロールID (デフォルト: user-admin-role)
+# USER_ADMIN_ROLE=user-admin-role
 
 # ────────────────────────────────────────────────────────────
 # API 設定
@@ -51,16 +48,8 @@ CORS_ORIGIN=http://localhost:5173
 # ユーザ一覧ページネーション件数 (0=無制限)
 # USER_DISPLAY_LIMIT=0
 
-# グループ一覧ページネーション件数 (0=無制限)
-# GROUP_DISPLAY_LIMIT=0
-
-# ────────────────────────────────────────────────────────────
-# エンドポイント権限設定
-# ────────────────────────────────────────────────────────────
-
-# エンドポイント権限設定 (JSON形式、省略時はデフォルト値を使用)
-# 例: /boards への POST を auth ユーザーにも許可する場合:
-# ENDPOINT_PERMISSIONS={"\/boards":{"ownerUserId":"$SYS_ADMIN","ownerGroupId":"$BBS_ADMIN_GROUP","permissions":"15,15,12,12"}}
+# ロール一覧ページネーション件数 (0=無制限)
+# ROLE_DISPLAY_LIMIT=0
 
 # ────────────────────────────────────────────────────────────
 # KV プレフィックス (複数インスタンスで同一 KV を共有する場合)

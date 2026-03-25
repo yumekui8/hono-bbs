@@ -230,17 +230,18 @@ npm run cf-typegen
 | 変数名 | 必須 | デフォルト | 説明 |
 |---|---|---|---|
 | `ADMIN_INITIAL_PASSWORD` | ✅ | — | admin 初期パスワード。`POST /auth/setup` で使用後は削除推奨 |
-| `CORS_ORIGIN` | ✅ | `*` | 許可する CORS オリジン (カンマ区切り) |
+| `CORS_ORIGIN` | | `*` | 許可する CORS オリジン (カンマ区切り) |
 | `ENABLE_TURNSTILE` | | — | `true` で `X-Turnstile-Session` を SESSION_KV で検証する |
 | `ADMIN_USERNAME` | | `admin` | 管理者ユーザID |
-| `USER_ADMIN_GROUP` | | `user-admin-group` | ユーザ管理グループID |
-| `BBS_ADMIN_GROUP` | | `bbs-admin-group` | 掲示板管理グループID |
+| `USER_ADMIN_ROLE` | | `user-admin-role` | ユーザ管理ロールID |
 | `API_BASE_PATH` | | `/api/v1` | API ベースパス |
 | `BBS_ALLOW_DOMAIN` | | — | 許可するホストドメイン (カンマ区切り、未設定で制限なし) |
 | `MAX_REQUEST_SIZE` | | — | リクエストボディサイズ上限 (例: `1mb`, `500kb`) |
-| `ENDPOINT_PERMISSIONS` | | — | エンドポイント権限 JSON (省略時はデフォルト値を使用) |
 | `USER_DISPLAY_LIMIT` | | `0` | ユーザ一覧の1ページあたり件数 (0=無制限) |
-| `GROUP_DISPLAY_LIMIT` | | `0` | グループ一覧の1ページあたり件数 (0=無制限) |
+| `ROLE_DISPLAY_LIMIT` | | `0` | ロール一覧の1ページあたり件数 (0=無制限) |
+| `DELETED_POSTER_NAME` | | `あぼーん` | ソフトデリート済み投稿の名前欄 |
+| `DELETED_CONTENT` | | `このレスは削除されました` | ソフトデリート済み投稿の本文 |
+| `KV_PREFIX` | | — | KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止) |
 
 > Turnstile 関連の設定 (`TURNSTILE_SITE_KEY` 等) は **turnstileApiToken プラグイン** 側の設定です。
 > hono-bbs 本体は `ENABLE_TURNSTILE` と `SESSION_KV` binding のみを参照します。
@@ -261,8 +262,10 @@ hono-bbs/
     types/            # 型定義
     utils/            # 汎用関数
   schema/
-    init.sql          # DB 初期化 SQL (DROP + CREATE + 初期データ)
-    *.sql             # テーブル別スキーマ (参照用)
+    init.sql                   # DB 初期化 SQL (DROP + CREATE + 初期データ)
+    init.mysql.sql             # MySQL / MariaDB 用
+    init.postgresql.sql        # PostgreSQL 用
+    migrate_add_is_deleted.sql # posts テーブルへの is_deleted カラム追加
   docs/
     setup.md          # このファイル
     admin-operations.md
