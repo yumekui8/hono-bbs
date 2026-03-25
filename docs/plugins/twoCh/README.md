@@ -156,9 +156,9 @@ hono-bbs に 2ch 専用ブラウザ互換の読み書きインターフェース
 ```
 
 - **名前**: `poster_name`。空の場合は `名無し`
-- **メール**: `poster_sub_info`。`sage` 等
+- **メール**: `poster_option_info`。`sage` 等
 - **日付**: JST 変換済み、形式 `YYYY/MM/DD(曜) HH:MM:SS.mmm`
-- **ID**: ` ID:{display_user_id}` の形式で日付の後ろに付与。`display_user_id` が空の場合は省略
+- **ID**: ` ID:{author_id}` の形式で日付の後ろに付与。`author_id` が空の場合は省略
 - **本文**: `\n` → `<br>`、HTML エンティティ変換済み（後述）
 - **スレタイトル**: 1行目 (最初のレス) のみ設定。2行目以降は空文字
 
@@ -238,19 +238,10 @@ Cookie と mail が両方ある場合は Cookie を優先する。mail がトー
 | DB カラム | 値 |
 |---|---|
 | `poster_name` | `FROM` フィールド または板の `default_poster_name` |
-| `poster_sub_info` | `mail` フィールド (Turnstile トークンとして使用された場合は空文字列) |
-| `display_user_id` | 後述のデイリー ID |
+| `poster_option_info` | `mail` フィールド (Turnstile トークンとして使用された場合は空文字列) |
+| `author_id` | 後述のデイリー ID |
 | `content` | `MESSAGE` フィールド (UTF-8 で保存) |
-| `permissions` | `"10,10,10,8"` (固定) |
-| `owner_user_id` | `POST_OWNER_USER` 環境変数 (未設定時 NULL) |
-| `owner_group_id` | `POST_OWNER_GROUP` 環境変数 (未設定時 NULL) |
-
-スレッド作成時の追加フィールド:
-
-| DB カラム | 値 |
-|---|---|
-| `owner_user_id` | `THREAD_OWNER_USER` 環境変数 (未設定時 NULL) |
-| `owner_group_id` | `THREAD_OWNER_GROUP` 環境変数 (未設定時 NULL) |
+| `permissions` | 板の `default_post_permissions` を使用 |
 
 **レスポンス**
 

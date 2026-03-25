@@ -3,20 +3,13 @@ import type { AppEnv } from '../types'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import * as identityService from '../services/identityService'
 import { getSystemIds } from '../utils/constants'
-import { parseEndpointPermissions, getEndpointPermConfig } from '../utils/endpointPermissions'
 
 // GET /profile - 自分のプロフィール取得
 export async function getProfileHandler(c: Context<AppEnv>): Promise<Response> {
   const userId = c.get('userId')!
   const user = await identityService.getUser(c.get('db'), userId, userId, true)
   if (!user) return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-  const endpointConfig = getEndpointPermConfig('/profile', customPerms, sysIds)
-  return c.json({
-    data: user,
-    endpoint: endpointConfig,
-  })
+  return c.json({ data: user })
 }
 
 // PUT /profile - 自分のプロフィール更新 (パスワード変更も同時に可能)

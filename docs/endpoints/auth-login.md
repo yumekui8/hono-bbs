@@ -19,16 +19,6 @@ Turnstile セッション (`X-Turnstile-Session`) が必要なため、
 
 ---
 
-## `GET /auth/login`
-
-このエンドポイント自体の権限情報を返す。
-
-### レスポンス
-
-- `200 OK` — `{ "data": { "ownerUserId": "...", "ownerGroupId": "...", "permissions": "..." } }`
-
----
-
 ## `POST /auth/login`
 
 ログインしてセッションを発行する。
@@ -62,17 +52,11 @@ Turnstile セッション (`X-Turnstile-Session`) が必要なため、
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "data": {
-      "type": "object",
-      "properties": {
-        "sessionId":   { "type": "string", "description": "X-Session-Id に使用。24時間有効" },
-        "userId":      { "type": "string" },
-        "displayName": { "type": "string" },
-        "expiresAt":   { "type": "string", "format": "date-time" }
-      }
-    }
+  "data": {
+    "sessionId":   "string  // X-Session-Id に使用。24時間有効",
+    "userId":      "string",
+    "displayName": "string",
+    "expiresAt":   "string  // ISO 8601 形式"
   }
 }
 ```
@@ -83,5 +67,5 @@ Turnstile セッション (`X-Turnstile-Session`) が必要なため、
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | バリデーション失敗 |
 | `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
-| `INVALID_CREDENTIALS` | 401 | ID またはパスワードが誤り、またはアカウントが無効 |
+| `INVALID_CREDENTIALS` | 401 | ID またはパスワードが誤り、またはアカウントが無効 (`isActive: false`) |
 | `TOO_MANY_ATTEMPTS` | 429 | 短時間にログイン失敗が多すぎる (15分間で10回失敗でロック) |

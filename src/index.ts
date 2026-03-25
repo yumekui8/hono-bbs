@@ -44,7 +44,7 @@ function buildCorsHeaders(request: Request, corsOrigin: string | undefined): Hea
   if (!allowOrigin) return {}
   return {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id, X-Turnstile-Session',
     'Access-Control-Max-Age': '86400',
   }

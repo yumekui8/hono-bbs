@@ -8,16 +8,16 @@ export type IdFormat =
 
 export type User = {
   id: string              // ログインID兼表示ID (変更不可)
-  displayName: string     // 表示名 (日本語可)
-  bio: string | null      // 自己紹介
-  email: string | null    // メールアドレス
-  isActive: boolean       // アカウント有効フラグ (管理者のみ変更可)
-  primaryGroupId: string | null
+  displayName: string
+  bio: string | null
+  email: string | null
+  isActive: boolean
+  primaryRoleId: string | null
   createdAt: string
   updatedAt: string
 }
 
-export type Group = {
+export type Role = {
   id: string
   name: string
   createdAt: string
@@ -26,7 +26,7 @@ export type Group = {
 export type Session = {
   id: string
   userId: string
-  isActive: boolean       // セッション有効フラグ (false で無効化済み)
+  isActive: boolean
   createdAt: string
   expiresAt: string
 }
@@ -46,25 +46,27 @@ export type AdminMeta = {
 
 export type Board = {
   id: string
-  ownerUserId: string | null
-  ownerGroupId: string | null
-  permissions: string           // "owner,group,auth,anon" 各値は操作ビットマスク
+  administrators: string        // カンマ区切りのユーザID/ロールID
+  members: string
+  permissions: string           // "admins,members,users,anon" 各値は操作ビットマスク (0-31)
   name: string
-  description: string | null
-  maxThreads: number
-  maxThreadTitleLength: number
-  defaultMaxPosts: number
-  defaultMaxPostLength: number
-  defaultMaxPostLines: number
-  defaultMaxPosterNameLength: number
-  defaultMaxPosterSubInfoLength: number
-  defaultMaxPosterMetaInfoLength: number
+  description: string
+  maxThreads: number            // 0=無制限
+  maxThreadTitleLength: number  // 0=無制限
+  defaultMaxPosts: number       // 0=無制限
+  defaultMaxPostLength: number  // 0=無制限
+  defaultMaxPostLines: number   // 0=無制限
+  defaultMaxPosterNameLength: number    // 0=無制限
+  defaultMaxPosterOptionLength: number  // 0=無制限
   defaultPosterName: string
   defaultIdFormat: IdFormat
-  defaultThreadOwnerUserId: string | null
-  defaultThreadOwnerGroupId: string | null
+  defaultThreadAdministrators: string   // テンプレート展開済み (作成時に $CREATOR 等を解決)
+  defaultThreadMembers: string
   defaultThreadPermissions: string
-  category: string | null              // カテゴリ / タグ (省略可)
+  defaultPostAdministrators: string
+  defaultPostMembers: string
+  defaultPostPermissions: string
+  category: string
   createdAt: string
   adminMeta: AdminMeta
 }
@@ -72,40 +74,40 @@ export type Board = {
 export type Thread = {
   id: string
   boardId: string
-  ownerUserId: string | null
-  ownerGroupId: string | null
+  administrators: string
+  members: string
   permissions: string
   title: string
-  // NULLは板の設定を継承
-  maxPosts: number | null
-  maxPostLength: number | null
-  maxPostLines: number | null
-  maxPosterNameLength: number | null
-  maxPosterSubInfoLength: number | null
-  maxPosterMetaInfoLength: number | null
-  posterName: string | null
-  idFormat: IdFormat | null
+  maxPosts: number              // 0=ボードのデフォルトを継承
+  maxPostLength: number         // 0=ボードのデフォルトを継承
+  maxPostLines: number          // 0=ボードのデフォルトを継承
+  maxPosterNameLength: number   // 0=ボードのデフォルトを継承
+  maxPosterOptionLength: number // 0=ボードのデフォルトを継承
+  posterName: string            // ''=ボードのデフォルトを継承
+  idFormat: string              // ''=ボードのデフォルトを継承
   postCount: number
+  isEdited: boolean
+  editedAt: string | null
   createdAt: string
   updatedAt: string
   adminMeta: AdminMeta
-  // スレッド一覧取得時のみ含まれる (postNumber=1 の第1レス)
-  firstPost?: Post | null
+  firstPost?: Post | null       // スレッド一覧取得時のみ含まれる
 }
 
 export type Post = {
   id: string
   threadId: string
   postNumber: number
-  ownerUserId: string | null    // 投稿者ユーザID (匿名の場合 NULL)
-  ownerGroupId: string | null   // スレッドの ownerGroupId を継承
-  permissions: string           // "owner,group,auth,anon" 各値は操作ビットマスク
-  userId: string | null         // ログイン中ユーザID (adminMeta 用)
-  displayUserId: string
+  administrators: string
+  members: string
+  permissions: string
+  authorId: string              // idFormat に従って計算された表示ID
   posterName: string
-  posterSubInfo: string | null
+  posterOptionInfo: string
   content: string
-  isDeleted: boolean            // ソフト削除フラグ
+  isDeleted: boolean
+  isEdited: boolean
+  editedAt: string | null
   createdAt: string
   adminMeta: AdminMeta
 }
@@ -118,39 +120,31 @@ export type { DbAdapter, KvAdapter }
 export type AppEnv = {
   Bindings: {
     // ── Cloudflare Workers ネイティブバインディング ──────────────
-    // Node.js 環境では不要 (src/index.node.ts でアダプターを直接生成する)
-    DB?: D1Database                // Cloudflare D1 (Workers のみ)
-    SESSION_KV?: KVNamespace       // Cloudflare KV (Workers のみ)
+    DB?: D1Database
+    SESSION_KV?: KVNamespace
     // ── 認証・セキュリティ ────────────────────────────────────────
-    ENABLE_TURNSTILE?: string      // 'true' のとき KV で Turnstile セッションを検証する
-    ADMIN_INITIAL_PASSWORD?: string // POST /auth/setup で使用
-    ADMIN_USERNAME?: string        // 管理者ユーザID (デフォルト: admin)
-    USER_ADMIN_GROUP?: string      // ユーザ管理グループID (デフォルト: user-admin-group)
-    BBS_ADMIN_GROUP?: string       // 掲示板管理グループID (デフォルト: bbs-admin-group)
+    ENABLE_TURNSTILE?: string
+    ADMIN_INITIAL_PASSWORD?: string
+    ADMIN_USERNAME?: string
+    USER_ADMIN_ROLE?: string       // ユーザ管理ロールID (デフォルト: user-admin-role)
     // ── API 設定 ─────────────────────────────────────────────────
-    ENDPOINT_PERMISSIONS?: string  // エンドポイント権限JSON (省略時はデフォルト値を使用)
-    MAX_REQUEST_SIZE?: string      // リクエストサイズ上限 例: "1mb", "500kb"
-    DELETED_POSTER_NAME?: string   // ソフトデリート済み投稿の名前欄 (デフォルト: あぼーん)
-    DELETED_CONTENT?: string       // ソフトデリート済み投稿の本文 (デフォルト: このレスは削除されました)
-    API_BASE_PATH: string          // e.g. "/api/v1"
-    CORS_ORIGIN?: string           // 許可するオリジン カンマ区切り
-    BBS_ALLOW_DOMAIN?: string      // 許可するドメイン カンマ区切り (未設定時は制限なし)
-    USER_DISPLAY_LIMIT?: string    // ユーザ一覧ページネーション件数 (0=無制限)
-    GROUP_DISPLAY_LIMIT?: string   // グループ一覧ページネーション件数 (0=無制限)
-    // ── KV プレフィックス ─────────────────────────────────────────
-    // 複数インスタンスで同一 KV ネームスペース / Redis を共有する際のキー衝突防止
-    // 例: "prod:" → "prod:session:{id}", "prod:turnstile:{id}" のように付与される
+    MAX_REQUEST_SIZE?: string
+    DELETED_POSTER_NAME?: string
+    DELETED_CONTENT?: string
+    API_BASE_PATH: string
+    CORS_ORIGIN?: string
+    BBS_ALLOW_DOMAIN?: string
+    USER_DISPLAY_LIMIT?: string
+    ROLE_DISPLAY_LIMIT?: string    // ロール一覧ページネーション件数 (0=無制限)
     KV_PREFIX?: string
   }
   Variables: {
-    // セットアップミドルウェア (src/middleware/adapters.ts) が設定するアダプター
-    db: DbAdapter                  // DB アダプター (D1 / MySQL / PostgreSQL / SQLite)
-    kv: KvAdapter                  // KV アダプター (Cloudflare KV / Redis / Memory)
-    // 認証コンテキスト (src/middleware/auth.ts が設定)
-    userId: string | null          // セッションから取得したユーザID
-    isAdmin: boolean               // bbsAdminGroup メンバーかどうか
-    isUserAdmin: boolean           // userAdminGroup メンバーかどうか
-    userGroupIds: string[]         // ユーザが所属するグループID一覧
-    primaryGroupId: string | null  // ユーザのプライマリグループID
+    db: DbAdapter
+    kv: KvAdapter
+    userId: string | null
+    isSysAdmin: boolean          // admin-role メンバー (全権限バイパス)
+    isUserAdmin: boolean         // user-admin-role メンバー (ユーザ管理 + adminMeta 参照)
+    userRoleIds: string[]        // ユーザが持つロールID一覧
+    primaryRoleId: string | null
   }
 }

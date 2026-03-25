@@ -1,191 +1,133 @@
-# エンドポイント: `/boards/:boardId/:threadId` (投稿操作) および `/boards/:boardId/:threadId/:responseNumber`
+# エンドポイント: 投稿 (Posts)
 
 ベースパス: `{API_BASE_PATH}/boards/:boardId/:threadId`
 
 ## 概要
 
-投稿 (Post) の作成・取得・更新・ソフトデリートを行う。
+投稿 (Post) の作成・取得・更新・削除を行う。
 
-### 役割・実装の説明
-
-投稿作成 (`POST /boards/:boardId/:threadId`) はスレッドの POST 権限チェックを行う。
-投稿番号 (`postNumber`) はスレッド内で 1 始まりの連番。
-
-投稿には「ハード削除」がなく、「ソフトデリート」のみ存在する。
-ソフトデリートは `DELETE` で `isDeleted` フラグを立てる実装。ソフトデリートされた投稿は
-`posterName` / `posterSubInfo` / `content` が環境変数 (`DELETED_POSTER_NAME` / `DELETED_CONTENT`) で設定した文字列に置き換えられてレスポンスに含まれる。
-`PUT` は content の内容更新に使用する。
-
-`displayUserId` は板の `defaultIdFormat` (スレッドが上書き可能) に従って計算される匿名/表示用ID。
-
-投稿の権限は作成時に `"15,0,14,0"` (GET: 全員, POST: 不可, PUT: owner+group+auth, DELETE: 不可) が設定される。
-権限フィルタリング: クライアントが GET 権限を持たない投稿は親スレッドのレスポンスから除外される。
+- **PUT**: 投稿内容 (本文・名前等) の更新。`isEdited` フラグが立つ。
+- **PATCH**: 投稿の権限設定 (`administrators`、`members`、`permissions`) の変更。
+- **DELETE**: ソフトデリート。物理削除はなし。削除後も投稿番号は保持され、本文・名前は `DELETED_CONTENT`・`DELETED_POSTER_NAME` 環境変数の値に置き換えられる。
 
 ### Post スキーマ
 
-```json
+```jsonc
 {
-  "type": "object",
-  "properties": {
-    "id":            { "type": "string" },
-    "threadId":      { "type": "string" },
-    "postNumber":    { "type": "integer", "description": "スレッド内の連番。1始まり" },
-    "ownerUserId":   { "type": ["string", "null"], "description": "投稿者ユーザID (匿名の場合 null)" },
-    "ownerGroupId":  { "type": ["string", "null"], "description": "スレッドの ownerGroupId を継承" },
-    "permissions":   { "type": "string", "description": "\"GET,POST,PUT,DELETE\" 形式のビットマスク" },
-    "userId":        { "type": ["string", "null"], "description": "ログイン中ユーザID (adminMeta 用)" },
-    "displayUserId": { "type": "string", "description": "板の idFormat に従って計算された表示ID" },
-    "posterName":    { "type": "string" },
-    "posterSubInfo": { "type": ["string", "null"] },
-    "content":       { "type": "string" },
-    "isDeleted":     { "type": "boolean", "description": "ソフトデリート済みの場合 true。name/content はマスクされる" },
-    "createdAt":     { "type": "string", "format": "date-time" },
-    "adminMeta": {
-      "type": "object",
-      "description": "user-admin-group または bbs-admin-group メンバーのみ付与",
-      "properties": {
-        "creatorUserId":             { "type": ["string", "null"] },
-        "creatorSessionId":          { "type": ["string", "null"] },
-        "creatorTurnstileSessionId": { "type": ["string", "null"] }
-      }
-    }
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "threadId": "550e8400-e29b-41d4-a716-446655440000",
+  "postNumber": 1,                    // スレッド内の投稿番号 (1始まり)
+  "administrators": "user123",        // カンマ区切りの userId/roleId
+  "members": "",
+  "permissions": "31,28,24,16",       // admins,members,users,anon (各値 0-31)
+  "authorId": "Ab3xY7q9",             // idFormat に従って計算された表示ID
+  "posterName": "名無しさん",
+  "posterOptionInfo": "",             // メール欄等の補助情報
+  "content": "投稿本文",
+  "isDeleted": false,
+  "isEdited": false,
+  "editedAt": null,
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  // adminMeta: admin-role または user-admin-role メンバーのみ返却
+  "adminMeta": {
+    "creatorUserId": "user123",
+    "creatorSessionId": "session-uuid",
+    "creatorTurnstileSessionId": "turnstile-uuid"
   }
 }
 ```
 
-### displayUserId の計算方式 (idFormat)
+#### ソフトデリート後のレスポンス例
 
-| 値 | 説明 |
-|---|---|
-| `daily_hash` | 全員: `hash(TurnstileSessionId + ":" + YYYY-MM-DD UTC)` 先頭10文字 |
-| `daily_hash_or_user` | 匿名: 日毎ハッシュ / ログイン済み: ユーザID先頭10文字 |
-| `api_key_hash` | 全員: `hash(TurnstileSessionId)` 先頭10文字 (日付非依存) |
-| `api_key_hash_or_user` | 匿名: TurnstileセッションIDハッシュ / ログイン済み: ユーザID先頭10文字 |
-| `none` | 表示なし (空文字列) |
+`isDeleted: true` の投稿は本文・名前が環境変数の値に置き換えられる。
+
+```json
+{
+  "postNumber": 3,
+  "posterName": "あぼーん",
+  "posterOptionInfo": "",
+  "content": "このレスは削除されました",
+  "isDeleted": true
+}
+```
 
 ---
 
 ## `POST /boards/:boardId/:threadId`
 
-投稿を作成する。スレッドの POST 権限が必要。
+投稿を作成する。スレッドの **POST 権限**が必要。
 
 ### 認証
 
-- `X-Turnstile-Session` 必須
-- `X-Session-Id` — 任意 (認証ユーザで投稿する場合)
+- `X-Turnstile-Session` 必須 (ENABLE_TURNSTILE=true 時)
 
-### リクエスト
+### リクエストボディ
 
 ```json
 {
-  "type": "object",
-  "required": ["content"],
-  "properties": {
-    "content": {
-      "type": "string",
-      "description": "1文字以上、スレッド→板の maxPostLength 以下、maxPostLines 行以下"
-    },
-    "posterName": {
-      "type": "string",
-      "description": "省略時はスレッド→板のデフォルト投稿者名",
-      "maxLength": 50
-    },
-    "posterSubInfo": {
-      "type": "string",
-      "description": "sage 等。省略可",
-      "maxLength": 100
-    }
-  }
+  "content": "投稿本文",
+  "posterName": "投稿者名 (省略時はスレッド→ボードのデフォルト)",
+  "posterOptionInfo": "メール欄等 (省略可)"
 }
 ```
 
 ### レスポンス
 
-- `201 Created`
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "data": { "$ref": "#/Post" }
-  }
-}
-```
+- `201 Created` — 作成した `Post` オブジェクト
 
 ### エラー
 
 | コード | HTTP | 説明 |
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | バリデーション失敗 |
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
-| `FORBIDDEN` | 403 | スレッドの POST 権限がない |
+| `FORBIDDEN` | 403 | POST 権限なし |
 | `THREAD_NOT_FOUND` | 404 | スレッドが存在しない |
 | `POST_LIMIT_REACHED` | 422 | 投稿数が上限に達した |
-| `CONTENT_TOO_LONG` | 422 | 本文が上限文字数を超えた |
-| `CONTENT_TOO_MANY_LINES` | 422 | 本文行数が上限を超えた |
+| `CONTENT_TOO_LONG` | 422 | 本文が文字数制限を超過 |
+| `CONTENT_TOO_MANY_LINES` | 422 | 本文が行数制限を超過 |
 
 ---
 
 ## `GET /boards/:boardId/:threadId/:responseNumber`
 
-レス番号で単一の投稿を取得する。
-スレッドまたは投稿自体に GET 権限がない場合は 404 を返す。
+指定した投稿番号の投稿を取得する。スレッドの GET 権限が必要。
+
+`:responseNumber` はスレッド内の投稿番号 (1始まりの整数)。
 
 ### 認証
 
-不要 (ただし認証によって権限チェック結果が変わる)
-
-### パスパラメータ
-
-| パラメータ | 説明 |
-|---|---|
-| `boardId` | 板 ID |
-| `threadId` | スレッド ID |
-| `responseNumber` | 投稿番号 (1始まりの整数) |
+不要
 
 ### レスポンス
 
-- `200 OK`
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "data": { "$ref": "#/Post" }
-  }
-}
-```
+- `200 OK` — `Post` オブジェクト
 
 ### エラー
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | responseNumber が不正 |
-| `POST_NOT_FOUND` | 404 | 投稿が存在しない、またはスレッド/投稿の読み取り権限がない |
+| `VALIDATION_ERROR` | 400 | responseNumber が正の整数でない |
+| `POST_NOT_FOUND` | 404 | 投稿が存在しない、または GET 権限なし |
 
 ---
 
 ## `PUT /boards/:boardId/:threadId/:responseNumber`
 
-投稿の本文 (content) を更新する。投稿の PUT 権限が必要。
+投稿の **内容** (本文・投稿者名・posterOptionInfo) を更新し、`isEdited` フラグを立てる。
+投稿の **PUT 権限**が必要。
+権限設定を変更したい場合は `PATCH` を使用する。
 
 ### 認証
 
 - `X-Turnstile-Session` 必須
-- `X-Session-Id` — 権限によっては必要
 
-### リクエスト
+### リクエストボディ
 
-```json
+```jsonc
 {
-  "type": "object",
-  "required": ["content"],
-  "properties": {
-    "content": {
-      "type": "string",
-      "description": "1文字以上"
-    }
-  }
+  "content": "新しい本文",         // 最大 10000 文字
+  "posterName": "新しい投稿者名",  // 最大 50 文字
+  "posterOptionInfo": "新しいオプション" // 最大 100 文字
 }
 ```
 
@@ -197,8 +139,45 @@
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | responseNumber が不正またはボディが不正 |
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
+| `FORBIDDEN` | 403 | 権限不足 |
+| `POST_NOT_FOUND` | 404 | 投稿が存在しない |
+
+---
+
+## `PATCH /boards/:boardId/:threadId/:responseNumber`
+
+投稿の **権限設定** (`administrators`、`members`、`permissions`) を更新する。
+投稿の **PATCH 権限**が必要。ログインが必要。
+
+`isEdited` フラグは変更されない (PATCH は権限設定変更のため)。
+
+### 認証
+
+- `X-Session-Id` 必須
+- `X-Turnstile-Session` 必須
+
+### リクエストボディ
+
+```jsonc
+{
+  "administrators": "$CREATOR,moderator-role",  // $CREATOR/$PARENTS 使用可
+  "members": "",
+  "permissions": "31,28,24,16"
+}
+```
+
+すべてのフィールドは省略可能。
+
+### レスポンス
+
+- `200 OK` — 更新後の `Post` オブジェクト
+
+### エラー
+
+| コード | HTTP | 説明 |
+|---|---|---|
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
 | `FORBIDDEN` | 403 | 権限不足 |
 | `POST_NOT_FOUND` | 404 | 投稿が存在しない |
 
@@ -206,27 +185,20 @@
 
 ## `DELETE /boards/:boardId/:threadId/:responseNumber`
 
-投稿をソフトデリートする。`isDeleted` フラグが立ち、以後のレスポンスで name/content がマスクされる。
-投稿の DELETE 権限が必要。ハード削除は存在しない。
+投稿をソフトデリートする。投稿の **DELETE 権限**が必要。
+物理削除はなく、`isDeleted` フラグが立てられる。
 
 ### 認証
 
 - `X-Turnstile-Session` 必須
-- `X-Session-Id` — 権限によっては必要
-
-### リクエスト
-
-リクエストボディは不要。
 
 ### レスポンス
 
-- `200 OK` — ソフトデリート後の `Post` オブジェクト (posterName/content がマスク済み)
+- `200 OK` — ソフトデリート後の `Post` オブジェクト (本文・名前はマスクされた状態)
 
 ### エラー
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | responseNumber が不正 |
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
 | `FORBIDDEN` | 403 | 権限不足 |
 | `POST_NOT_FOUND` | 404 | 投稿が存在しない |

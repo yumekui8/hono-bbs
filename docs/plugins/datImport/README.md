@@ -17,6 +17,9 @@ POST /admin/datimport?board=<boardId>
 { data: { threadId, boardId, postCount } }
 ```
 
+インポート操作は `ADMIN_ROLE` 環境変数で指定したロール (`admin-role` デフォルト) に
+所属するユーザのみ実行できます。これは hono-bbs のシステム管理者ロールに相当します。
+
 ---
 
 ## dat ファイル形式
@@ -77,7 +80,7 @@ POST /admin/datimport?board=<boardId>
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | 必須パラメータ不足、Content-Type 不正、dat が空 |
 | `UNAUTHORIZED` | 401 | 管理者 ID またはパスワードが不正 |
-| `FORBIDDEN` | 403 | 管理者グループ非所属 |
+| `FORBIDDEN` | 403 | `ADMIN_ROLE` で指定したロール非所属 |
 | `NOT_FOUND` | 404 | 指定した板が存在しない |
 
 ---
@@ -155,9 +158,25 @@ export DATIMPORT_PASSWORD=mypassword
 
 | 変数名 | 必須 | デフォルト | 説明 |
 |---|---|---|---|
-| `BBS_ADMIN_GROUP` | | `bbs-admin-group` | hono-bbs の BBS_ADMIN_GROUP と同じ値にすること |
-| `BASE_PATH` | | `` (なし) | エンドポイントのベースパス (例: `/dat`) |
+| `ADMIN_ROLE` | | `admin-role` | インポート操作を許可するロール ID。hono-bbs の `admin-role` と同じ値にすること |
+| `BASE_PATH` | | *(なし)* | エンドポイントのベースパス (例: `/dat`) |
 | `CORS_ORIGIN` | | `*` | 許可する CORS オリジン |
+
+---
+
+## DB カラムとのマッピング
+
+インポート時に dat フィールドをどの DB カラムに格納するかのマッピングです。
+
+| dat フィールド | DB カラム | 説明 |
+|---|---|---|
+| 名前欄 | `poster_name` | 投稿者名 |
+| メール欄 | `poster_option_info` | sage 等のオプション情報 |
+| 日付+ID部分のID | `author_id` | 日付内の ID 文字列 (`ID:abc12345` の部分) |
+| 本文 | `content` | 投稿本文 (`<br>` を `\n` に変換して保存) |
+
+スレッドの `permissions` は板の `default_thread_permissions` を使用します。
+投稿の `permissions` は板の `default_post_permissions` を使用します。
 
 ---
 

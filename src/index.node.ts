@@ -70,7 +70,7 @@ async function main() {
     if (!allowOrigin) return {}
     return {
       'Access-Control-Allow-Origin': allowOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-Session-Id, X-Turnstile-Session',
       'Access-Control-Max-Age': '86400',
     }
@@ -101,21 +101,19 @@ async function main() {
 
       // Node.js 環境では env は process.env から読み取る
       const env: AppEnv['Bindings'] = {
-        API_BASE_PATH: basePath,
-        ENABLE_TURNSTILE:        process.env.ENABLE_TURNSTILE,
-        ADMIN_INITIAL_PASSWORD:  process.env.ADMIN_INITIAL_PASSWORD,
-        ADMIN_USERNAME:          process.env.ADMIN_USERNAME,
-        USER_ADMIN_GROUP:        process.env.USER_ADMIN_GROUP,
-        BBS_ADMIN_GROUP:         process.env.BBS_ADMIN_GROUP,
-        ENDPOINT_PERMISSIONS:    process.env.ENDPOINT_PERMISSIONS,
-        MAX_REQUEST_SIZE:        process.env.MAX_REQUEST_SIZE,
-        CORS_ORIGIN:             corsOrigin,
-        BBS_ALLOW_DOMAIN:        process.env.BBS_ALLOW_DOMAIN,
-        USER_DISPLAY_LIMIT:      process.env.USER_DISPLAY_LIMIT,
-        GROUP_DISPLAY_LIMIT:     process.env.GROUP_DISPLAY_LIMIT,
-        KV_PREFIX:               process.env.KV_PREFIX,
-        DELETED_POSTER_NAME:     process.env.DELETED_POSTER_NAME,
-        DELETED_CONTENT:         process.env.DELETED_CONTENT,
+        API_BASE_PATH:          basePath,
+        ENABLE_TURNSTILE:       process.env.ENABLE_TURNSTILE,
+        ADMIN_INITIAL_PASSWORD: process.env.ADMIN_INITIAL_PASSWORD,
+        ADMIN_USERNAME:         process.env.ADMIN_USERNAME,
+        USER_ADMIN_ROLE:        process.env.USER_ADMIN_ROLE,
+        MAX_REQUEST_SIZE:       process.env.MAX_REQUEST_SIZE,
+        CORS_ORIGIN:            corsOrigin,
+        BBS_ALLOW_DOMAIN:       process.env.BBS_ALLOW_DOMAIN,
+        USER_DISPLAY_LIMIT:     process.env.USER_DISPLAY_LIMIT,
+        ROLE_DISPLAY_LIMIT:     process.env.ROLE_DISPLAY_LIMIT,
+        KV_PREFIX:              process.env.KV_PREFIX,
+        DELETED_POSTER_NAME:    process.env.DELETED_POSTER_NAME,
+        DELETED_CONTENT:        process.env.DELETED_CONTENT,
       }
 
       const response = await api.fetch(new Request(url.toString(), request), env)

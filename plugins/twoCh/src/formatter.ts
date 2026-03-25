@@ -30,9 +30,9 @@ function encodeContent(content: string): string {
 // 書式: 名前<>メール<>日付 ID<>本文<>スレタイトル（1行目のみ）
 export function datLine(post: PostRow, isFirst: boolean, threadTitle: string): string {
   const name    = post.poster_name || '名無し'
-  const mail    = post.poster_sub_info ?? ''
+  const mail    = post.poster_option_info ?? ''
   const date    = formatDate(post.created_at)
-  const id      = post.display_user_id ? ` ID:${post.display_user_id}` : ''
+  const id      = post.author_id ? ` ID:${post.author_id}` : ''
   const content = encodeContent(post.content)
   const title   = isFirst ? threadTitle : ''
   return `${name}<>${mail}<>${date}${id}<>${content}<>${title}\n`

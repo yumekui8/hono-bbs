@@ -294,13 +294,13 @@ export async function datHandler(c: Context<Env>): Promise<Response> {
   }
 
   const posts = await db.all<PostRow>(
-    'SELECT post_number, poster_name, poster_sub_info, display_user_id, content, created_at, is_deleted FROM posts WHERE thread_id = ? ORDER BY post_number ASC',
+    'SELECT post_number, poster_name, poster_option_info, author_id, content, created_at, is_deleted FROM posts WHERE thread_id = ? ORDER BY post_number ASC',
     [thread.id],
   )
 
   // 削除済み投稿を「あぼーん」に置換
   const maskedPosts = posts.results.map(p =>
-    p.is_deleted ? { ...p, poster_name: 'あぼーん', poster_sub_info: null, display_user_id: 'あぼーん', content: 'あぼーん' } : p,
+    p.is_deleted ? { ...p, poster_name: 'あぼーん', poster_option_info: null, author_id: 'あぼーん', content: 'あぼーん' } : p,
   )
   const dat      = maskedPosts.map((p, i) => datLine(p, i === 0, thread.title)).join('')
   const sjisData = toShiftJis(dat)
@@ -363,9 +363,9 @@ export async function settingTxtHandler(c: Context<Env>): Promise<Response> {
   const board = await db.first<Pick<BoardRow,
     'id' | 'name' | 'default_poster_name' |
     'max_thread_title_length' | 'default_max_post_lines' |
-    'default_max_poster_name_length' | 'default_max_poster_sub_info_length' | 'default_max_post_length'
+    'default_max_poster_name_length' | 'default_max_poster_option_length' | 'default_max_post_length'
   >>(
-    'SELECT id, name, default_poster_name, max_thread_title_length, default_max_post_lines, default_max_poster_name_length, default_max_poster_sub_info_length, default_max_post_length FROM boards WHERE id = ?',
+    'SELECT id, name, default_poster_name, max_thread_title_length, default_max_post_lines, default_max_poster_name_length, default_max_poster_option_length, default_max_post_length FROM boards WHERE id = ?',
     [boardId],
   )
 
@@ -380,7 +380,7 @@ export async function settingTxtHandler(c: Context<Env>): Promise<Response> {
     `BBS_LINE_NUMBER=${board.default_max_post_lines}`,
     `BBS_SUBJECT_COUNT=${board.max_thread_title_length}`,
     `BBS_NAME_COUNT=${board.default_max_poster_name_length}`,
-    `BBS_MAIL_COUNT=${board.default_max_poster_sub_info_length}`,
+    `BBS_MAIL_COUNT=${board.default_max_poster_option_length}`,
     `BBS_MESSAGE_COUNT=${board.default_max_post_length}`,
     'BBS_SLIP=verbose',
     'BBS_FORCE_ID=checked',
@@ -425,21 +425,17 @@ export async function writeCgiHandler(c: Context<Env>): Promise<Response> {
     }
   }
 
-  const board = await db.first<Pick<BoardRow, 'id' | 'default_poster_name' | 'default_thread_permissions'>>(
-    'SELECT id, default_poster_name, default_thread_permissions FROM boards WHERE id = ?',
+  const board = await db.first<Pick<BoardRow, 'id' | 'default_poster_name' | 'default_thread_permissions' | 'default_post_permissions'>>(
+    'SELECT id, default_poster_name, default_thread_permissions, default_post_permissions FROM boards WHERE id = ?',
     [bbs],
   )
 
   if (!board) return errorCgi('指定された板が存在しません')
 
-  const ip              = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Real-IP') ?? ''
-  const userId          = await dailyId(ip)
-  const posterName      = from || board.default_poster_name
-  const now             = new Date().toISOString()
-  const threadOwnerUser = c.env.THREAD_OWNER_USER ?? null
-  const threadOwnerGroup= c.env.THREAD_OWNER_GROUP ?? null
-  const postOwnerUser   = c.env.POST_OWNER_USER ?? null
-  const postOwnerGroup  = c.env.POST_OWNER_GROUP ?? null
+  const ip         = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Real-IP') ?? ''
+  const authorId   = await dailyId(ip)
+  const posterName = from || board.default_poster_name
+  const now        = new Date().toISOString()
 
   if (key === '0' || key === '') {
     // 新規スレッド作成
@@ -458,12 +454,12 @@ export async function writeCgiHandler(c: Context<Env>): Promise<Response> {
     // D1 の batch 内では同バッチで挿入した行を FK チェック時に参照できないため、
     // スレッド作成と第1レス挿入を別々の run() で実行する
     await db.run(
-      'INSERT INTO threads (id, board_id, permissions, title, post_count, owner_user_id, owner_group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [threadId, bbs, board.default_thread_permissions, subject, 1, threadOwnerUser, threadOwnerGroup, now, now],
+      'INSERT INTO threads (id, board_id, permissions, title, post_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [threadId, bbs, board.default_thread_permissions, subject, 1, now, now],
     )
     await db.run(
-      'INSERT INTO posts (id, thread_id, post_number, permissions, display_user_id, poster_name, poster_sub_info, content, owner_user_id, owner_group_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [crypto.randomUUID(), threadId, 1, '10,10,10,8', userId, posterName, mail, message, postOwnerUser, postOwnerGroup, now],
+      'INSERT INTO posts (id, thread_id, post_number, permissions, author_id, poster_name, poster_option_info, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [crypto.randomUUID(), threadId, 1, board.default_post_permissions, authorId, posterName, mail, message, now],
     )
 
     return successCgi(bbs)
@@ -483,8 +479,8 @@ export async function writeCgiHandler(c: Context<Env>): Promise<Response> {
   const postNumber = thread.post_count + 1
   await db.batch([
     {
-      sql: 'INSERT INTO posts (id, thread_id, post_number, permissions, display_user_id, poster_name, poster_sub_info, content, owner_user_id, owner_group_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      params: [crypto.randomUUID(), thread.id, postNumber, '10,10,10,8', userId, posterName, mail, message, postOwnerUser, postOwnerGroup, now],
+      sql: 'INSERT INTO posts (id, thread_id, post_number, permissions, author_id, poster_name, poster_option_info, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      params: [crypto.randomUUID(), thread.id, postNumber, board.default_post_permissions, authorId, posterName, mail, message, now],
     },
     {
       sql: 'UPDATE threads SET post_count = ?, updated_at = ? WHERE id = ?',

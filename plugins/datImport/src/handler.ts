@@ -52,22 +52,22 @@ export async function datImportHandler(c: Context<Env>): Promise<Response> {
     return c.json({ error: 'UNAUTHORIZED', message: 'Invalid credentials' }, 401)
   }
 
-  // 管理者グループ所属チェック
-  const bbsAdminGroup = c.env.BBS_ADMIN_GROUP ?? 'bbs-admin-group'
+  // admin-role 所属チェック (ADMIN_ROLE 環境変数でカスタマイズ可)
+  const adminRole = c.env.ADMIN_ROLE ?? 'admin-role'
   const membership = await c.env.BBS_DB
-    .prepare('SELECT 1 FROM user_groups WHERE user_id = ? AND group_id = ?')
-    .bind(adminId, bbsAdminGroup)
+    .prepare('SELECT 1 FROM user_roles WHERE user_id = ? AND role_id = ?')
+    .bind(adminId, adminRole)
     .first()
 
   if (!membership) {
-    return c.json({ error: 'FORBIDDEN', message: 'BBS admin privileges required' }, 403)
+    return c.json({ error: 'FORBIDDEN', message: 'Admin role required' }, 403)
   }
 
   // 板の存在確認
   const board = await c.env.BBS_DB
-    .prepare('SELECT id, default_poster_name, default_thread_permissions FROM boards WHERE id = ?')
+    .prepare('SELECT id, default_poster_name, default_thread_permissions, default_post_permissions FROM boards WHERE id = ?')
     .bind(boardId)
-    .first<{ id: string; default_poster_name: string; default_thread_permissions: string }>()
+    .first<{ id: string; default_poster_name: string; default_thread_permissions: string; default_post_permissions: string }>()
 
   if (!board) {
     return c.json({ error: 'NOT_FOUND', message: `Board '${boardId}' not found` }, 404)
@@ -103,7 +103,7 @@ export async function datImportHandler(c: Context<Env>): Promise<Response> {
 
 async function insertDatPosts(
   db: D1Database,
-  board: { default_poster_name: string; default_thread_permissions: string },
+  board: { default_poster_name: string; default_thread_permissions: string; default_post_permissions: string },
   boardId: string,
   posts: DatPost[],
   importedBy: string,
@@ -141,10 +141,10 @@ async function insertDatPosts(
           crypto.randomUUID(),
           threadId,
           i + j + 1,
-          '10,10,10,8',
-          post.displayUserId,
+          board.default_post_permissions,
+          post.authorId,
           post.posterName || board.default_poster_name,
-          post.posterSubInfo,
+          post.posterOptionInfo,
           post.content,
           post.dateStr || now,
           importedBy,
@@ -152,7 +152,7 @@ async function insertDatPosts(
       }
 
       await db.prepare(
-        `INSERT INTO posts (id, thread_id, post_number, permissions, display_user_id, poster_name, poster_sub_info, content, created_at, creator_user_id) VALUES ${placeholders}`,
+        `INSERT INTO posts (id, thread_id, post_number, permissions, author_id, poster_name, poster_option_info, content, created_at, creator_user_id) VALUES ${placeholders}`,
       ).bind(...values).run()
     }
   } catch (err) {

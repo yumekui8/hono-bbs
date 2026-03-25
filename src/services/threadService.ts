@@ -7,87 +7,111 @@ import * as postRepository from '../repository/postRepository'
 import type { PostRange } from '../repository/postRepository'
 
 export type { PostRange }
-import { hasPermission } from '../utils/permission'
+import { hasPermission, expandTemplate, isValidPermissions } from '../utils/permission'
 import { computeDisplayUserId } from '../utils/hash'
 
+const ID_FORMATS = ['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none'] as const
+
 const createThreadSchema = z.object({
-  title: z.string().min(1).max(200),
-  content: z.string().min(1).max(5000),
+  title: z.string().min(1).max(500),
+  content: z.string().min(1).max(10000),
   posterName: z.string().max(50).optional(),
-  posterSubInfo: z.string().max(100).optional(),
+  posterOptionInfo: z.string().max(100).optional(),
 })
 
-const updateThreadSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  maxPosts: z.number().int().min(1).nullable().optional(),
-  posterName: z.string().max(50).nullable().optional(),
-  idFormat: z.enum(['daily_hash', 'daily_hash_or_user', 'api_key_hash', 'api_key_hash_or_user', 'none']).nullable().optional(),
+// PUT: title と posterName のみ更新 (is_edited フラグを立てる)
+const putThreadSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  posterName: z.string().max(50).optional(),
+})
+
+const permissionsField = z.string().refine(isValidPermissions, {
+  message: 'permissions は "admins,members,users,anon" 形式で各値 0-31 の整数を指定してください',
+})
+
+// PATCH: administrators/members/permissions/制限値 などを更新
+const patchThreadSchema = z.object({
+  administrators: z.string().max(500).optional(),
+  members: z.string().max(500).optional(),
+  permissions: permissionsField.optional(),
+  title: z.string().min(1).max(500).optional(),
+  posterName: z.string().max(50).optional(),
+  maxPosts: z.number().int().min(0).optional(),
+  maxPostLength: z.number().int().min(0).optional(),
+  maxPostLines: z.number().int().min(0).optional(),
+  maxPosterNameLength: z.number().int().min(0).optional(),
+  maxPosterOptionLength: z.number().int().min(0).optional(),
+  idFormat: z.enum([...ID_FORMATS, '']).optional(),
 })
 
 export type CreateThreadInput = z.infer<typeof createThreadSchema>
-export type UpdateThreadInput = z.infer<typeof updateThreadSchema>
+export type PutThreadInput = z.infer<typeof putThreadSchema>
+export type PatchThreadInput = z.infer<typeof patchThreadSchema>
 
 export function parseCreateThread(data: unknown): CreateThreadInput {
   return createThreadSchema.parse(data)
 }
 
-export function parseUpdateThread(data: unknown): UpdateThreadInput {
-  return updateThreadSchema.parse(data)
+export function parsePutThread(data: unknown): PutThreadInput {
+  return putThreadSchema.parse(data)
+}
+
+export function parsePatchThread(data: unknown): PatchThreadInput {
+  return patchThreadSchema.parse(data)
 }
 
 // 板情報とスレッド一覧を一緒に返す (GET /boards/:boardId)
-// 読み取り権限のないスレッドは除外される
 export async function getThreadsWithBoard(
   db: DbAdapter,
   boardId: string,
   userId: string | null,
-  userGroupIds: string[],
-  isAdmin: boolean,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
 ): Promise<{ board: Board; threads: Thread[] } | null> {
   const board = await boardRepository.findBoardById(db, boardId)
   if (!board) return null
-  // 板自体に読み取り権限がない場合は存在しないように見せる
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, operation: 'GET', isAdmin })) {
-    return null
-  }
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: board.administrators, members: board.members,
+    permissions: board.permissions, operation: 'GET', isSysAdmin,
+  })) return null
+
   const threads = await threadRepository.findThreadsByBoardId(db, boardId)
-  if (isAdmin) return { board, threads }
-  // 読み取り権限のないスレッドを除外
+  if (isSysAdmin) return { board, threads }
   const filtered = threads.filter(t => hasPermission({
-    userId, userGroupIds,
-    ownerUserId: t.ownerUserId, ownerGroupId: t.ownerGroupId,
-    permissions: t.permissions, operation: 'GET', isAdmin,
+    userId, userRoleIds,
+    administrators: t.administrators, members: t.members,
+    permissions: t.permissions, operation: 'GET', isSysAdmin,
   }))
   return { board, threads: filtered }
 }
 
 // スレッド情報と投稿一覧を一緒に返す (GET /boards/:boardId/:threadId)
-// ranges を指定すると該当範囲の投稿のみ返す (差分取得・部分取得)
-// 読み取り権限のない投稿は除外される
 export async function getThreadWithPosts(
   db: DbAdapter,
   boardId: string,
   threadId: string,
   userId: string | null,
-  userGroupIds: string[],
-  isAdmin: boolean,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
   ranges?: PostRange[],
 ): Promise<{ thread: Thread; posts: Post[] } | null> {
   const thread = await threadRepository.findThreadById(db, threadId)
   if (!thread || thread.boardId !== boardId) return null
-  // スレッド自体に読み取り権限がない場合は存在しないように見せる
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'GET', isAdmin })) {
-    return null
-  }
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: thread.administrators, members: thread.members,
+    permissions: thread.permissions, operation: 'GET', isSysAdmin,
+  })) return null
+
   const posts = ranges
     ? await postRepository.findPostsByRanges(db, threadId, ranges)
     : await postRepository.findPostsByThreadId(db, threadId)
-  if (isAdmin) return { thread, posts }
-  // 読み取り権限のない投稿を除外
+  if (isSysAdmin) return { thread, posts }
   const filtered = posts.filter(p => hasPermission({
-    userId, userGroupIds,
-    ownerUserId: p.ownerUserId, ownerGroupId: p.ownerGroupId,
-    permissions: p.permissions, operation: 'GET', isAdmin,
+    userId, userRoleIds,
+    administrators: p.administrators, members: p.members,
+    permissions: p.permissions, operation: 'GET', isSysAdmin,
   }))
   return { thread, posts: filtered }
 }
@@ -97,52 +121,62 @@ export async function createThread(
   boardId: string,
   input: CreateThreadInput,
   userId: string | null,
-  userGroupIds: string[],
-  isAdmin: boolean,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
   sessionId: string | null,
   turnstileSessionId: string | null,
 ): Promise<{ thread: Thread; firstPost: Post }> {
   const board = await boardRepository.findBoardById(db, boardId)
   if (!board) throw new Error('BOARD_NOT_FOUND')
 
-  // スレッド作成 = POST /boards/:boardId → 板の POST パーミッション確認
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: board.ownerUserId, ownerGroupId: board.ownerGroupId, permissions: board.permissions, operation: 'POST', isAdmin })) {
-    throw new Error('FORBIDDEN')
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: board.administrators, members: board.members,
+    permissions: board.permissions, operation: 'POST', isSysAdmin,
+  })) throw new Error('FORBIDDEN')
+
+  // スレッド数上限チェック (0=無制限)
+  if (board.maxThreads > 0) {
+    const existing = await threadRepository.findThreadsByBoardId(db, boardId)
+    if (existing.length >= board.maxThreads) throw new Error('THREAD_LIMIT_REACHED')
   }
 
-  // スレッド数上限チェック
-  const existing = await threadRepository.findThreadsByBoardId(db, boardId)
-  if (existing.length >= board.maxThreads) throw new Error('THREAD_LIMIT_REACHED')
-
   // タイトル長チェック
-  if (input.title.length > board.maxThreadTitleLength) throw new Error('TITLE_TOO_LONG')
+  if (board.maxThreadTitleLength > 0 && input.title.length > board.maxThreadTitleLength) {
+    throw new Error('TITLE_TOO_LONG')
+  }
 
-  // 本文の文字数・行数チェック
-  const maxLength = board.defaultMaxPostLength
-  const maxLines = board.defaultMaxPostLines
-  if (input.content.length > maxLength) throw new Error('CONTENT_TOO_LONG')
-  if (input.content.split('\n').length > maxLines) throw new Error('CONTENT_TOO_MANY_LINES')
+  // 本文の文字数・行数チェック (board デフォルト値で)
+  if (board.defaultMaxPostLength > 0 && input.content.length > board.defaultMaxPostLength) {
+    throw new Error('CONTENT_TOO_LONG')
+  }
+  if (board.defaultMaxPostLines > 0 && input.content.split('\n').length > board.defaultMaxPostLines) {
+    throw new Error('CONTENT_TOO_MANY_LINES')
+  }
 
   const now = new Date().toISOString()
 
-  // スレッドを post_count: 1 で作成 (ownerGroupId はスレッドのデフォルトグループを設定)
-  const threadOwnerGroupId = board.defaultThreadOwnerGroupId ?? board.ownerGroupId
+  // スレッドの administrators/members を展開 ($CREATOR → 作成者, $PARENTS → 板のadministrators)
+  const threadAdministrators = expandTemplate(board.defaultThreadAdministrators, userId, board.administrators)
+  const threadMembers = expandTemplate(board.defaultThreadMembers, userId, board.members)
+
   const thread: Thread = {
     id: crypto.randomUUID(),
     boardId,
-    ownerUserId: board.defaultThreadOwnerUserId ?? userId,
-    ownerGroupId: threadOwnerGroupId,
+    administrators: threadAdministrators,
+    members: threadMembers,
     permissions: board.defaultThreadPermissions,
     title: input.title,
-    maxPosts: null,
-    maxPostLength: null,
-    maxPostLines: null,
-    maxPosterNameLength: null,
-    maxPosterSubInfoLength: null,
-    maxPosterMetaInfoLength: null,
-    posterName: null,
-    idFormat: null,  // 板のデフォルトを継承
+    maxPosts: 0,
+    maxPostLength: 0,
+    maxPostLines: 0,
+    maxPosterNameLength: 0,
+    maxPosterOptionLength: 0,
+    posterName: '',
+    idFormat: '',
     postCount: 1,
+    isEdited: false,
+    editedAt: null,
     createdAt: now,
     updatedAt: now,
     adminMeta: { creatorUserId: userId, creatorSessionId: sessionId, creatorTurnstileSessionId: turnstileSessionId },
@@ -151,21 +185,27 @@ export async function createThread(
 
   // 第1レスを作成
   const idFormat = board.defaultIdFormat
-  const displayUserId = await computeDisplayUserId(idFormat, userId, turnstileSessionId)
+  const authorId = await computeDisplayUserId(idFormat, userId, turnstileSessionId)
   const posterName = input.posterName ?? board.defaultPosterName
+
+  // レスの administrators/members を展開 ($PARENTS → スレッドのadministrators)
+  const postAdministrators = expandTemplate(board.defaultPostAdministrators, userId, threadAdministrators)
+  const postMembers = expandTemplate(board.defaultPostMembers, userId, threadMembers)
 
   const firstPost: Post = {
     id: crypto.randomUUID(),
     threadId: thread.id,
     postNumber: 1,
-    ownerUserId: userId,          // 投稿者をオーナーに設定
-    ownerGroupId: threadOwnerGroupId,  // スレッドのグループを継承
-    permissions: '10,10,10,8',   // GET: all, PUT: owner+group+auth, それ以外: anon=GETのみ
-    userId,
-    displayUserId,
+    administrators: postAdministrators,
+    members: postMembers,
+    permissions: board.defaultPostPermissions,
+    authorId,
     posterName,
-    posterSubInfo: input.posterSubInfo ?? null,
+    posterOptionInfo: input.posterOptionInfo ?? '',
     content: input.content,
+    isDeleted: false,
+    isEdited: false,
+    editedAt: null,
     createdAt: now,
     adminMeta: { creatorUserId: userId, creatorSessionId: sessionId, creatorTurnstileSessionId: turnstileSessionId },
   }
@@ -174,24 +214,114 @@ export async function createThread(
   return { thread, firstPost }
 }
 
-export async function updateThread(
+// PUT: title/posterName を更新し isEdited フラグを立てる
+export async function putThread(
   db: DbAdapter,
   boardId: string,
   threadId: string,
-  input: UpdateThreadInput,
+  input: PutThreadInput,
   userId: string | null,
-  userGroupIds: string[],
-  isAdmin: boolean,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
 ): Promise<Thread | null> {
   const thread = await threadRepository.findThreadById(db, threadId)
   if (!thread || thread.boardId !== boardId) return null
 
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'PUT', isAdmin })) {
-    throw new Error('FORBIDDEN')
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: thread.administrators, members: thread.members,
+    permissions: thread.permissions, operation: 'PUT', isSysAdmin,
+  })) throw new Error('FORBIDDEN')
+
+  const now = new Date().toISOString()
+  await threadRepository.updateThread(db, threadId, {
+    title: input.title,
+    posterName: input.posterName,
+    isEdited: true,
+    editedAt: now,
+  })
+  return threadRepository.findThreadById(db, threadId)
+}
+
+// PATCH: メタデータ全般を更新
+export async function patchThread(
+  db: DbAdapter,
+  boardId: string,
+  threadId: string,
+  input: PatchThreadInput,
+  userId: string | null,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
+  sessionId: string | null,
+  turnstileSessionId: string | null,
+): Promise<Thread> {
+  const existing = await threadRepository.findThreadById(db, threadId)
+
+  if (!existing) {
+    // スレッドが存在しない場合: sys admin のみ作成可
+    if (!isSysAdmin) throw new Error('FORBIDDEN')
+    const board = await boardRepository.findBoardById(db, boardId)
+    if (!board) throw new Error('BOARD_NOT_FOUND')
+    const now = new Date().toISOString()
+    const administrators = expandTemplate(
+      input.administrators ?? board.defaultThreadAdministrators,
+      userId,
+      board.administrators,
+    )
+    const members = expandTemplate(
+      input.members ?? board.defaultThreadMembers,
+      userId,
+      board.members,
+    )
+    const thread: Thread = {
+      id: threadId,
+      boardId,
+      administrators,
+      members,
+      permissions: input.permissions ?? board.defaultThreadPermissions,
+      title: input.title ?? '',
+      maxPosts: input.maxPosts ?? 0,
+      maxPostLength: input.maxPostLength ?? 0,
+      maxPostLines: input.maxPostLines ?? 0,
+      maxPosterNameLength: input.maxPosterNameLength ?? 0,
+      maxPosterOptionLength: input.maxPosterOptionLength ?? 0,
+      posterName: input.posterName ?? '',
+      idFormat: input.idFormat ?? '',
+      postCount: 0,
+      isEdited: false,
+      editedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      adminMeta: { creatorUserId: userId, creatorSessionId: sessionId, creatorTurnstileSessionId: turnstileSessionId },
+    }
+    await threadRepository.insertThread(db, thread)
+    return thread
   }
 
-  await threadRepository.updateThread(db, threadId, input)
-  return threadRepository.findThreadById(db, threadId)
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: existing.administrators, members: existing.members,
+    permissions: existing.permissions, operation: 'PATCH', isSysAdmin,
+  })) throw new Error('FORBIDDEN')
+
+  const administrators = input.administrators !== undefined
+    ? expandTemplate(input.administrators, userId, existing.administrators)
+    : undefined
+
+  await threadRepository.updateThread(db, threadId, {
+    administrators,
+    members: input.members,
+    permissions: input.permissions,
+    title: input.title,
+    posterName: input.posterName,
+    maxPosts: input.maxPosts,
+    maxPostLength: input.maxPostLength,
+    maxPostLines: input.maxPostLines,
+    maxPosterNameLength: input.maxPosterNameLength,
+    maxPosterOptionLength: input.maxPosterOptionLength,
+    idFormat: input.idFormat,
+  })
+  return (await threadRepository.findThreadById(db, threadId))!
 }
 
 export async function deleteThread(
@@ -199,15 +329,17 @@ export async function deleteThread(
   boardId: string,
   threadId: string,
   userId: string | null,
-  userGroupIds: string[],
-  isAdmin: boolean,
+  userRoleIds: string[],
+  isSysAdmin: boolean,
 ): Promise<boolean> {
   const thread = await threadRepository.findThreadById(db, threadId)
   if (!thread || thread.boardId !== boardId) return false
 
-  if (!hasPermission({ userId, userGroupIds, ownerUserId: thread.ownerUserId, ownerGroupId: thread.ownerGroupId, permissions: thread.permissions, operation: 'DELETE', isAdmin })) {
-    throw new Error('FORBIDDEN')
-  }
+  if (!hasPermission({
+    userId, userRoleIds,
+    administrators: thread.administrators, members: thread.members,
+    permissions: thread.permissions, operation: 'DELETE', isSysAdmin,
+  })) throw new Error('FORBIDDEN')
 
   return threadRepository.deleteThread(db, threadId)
 }

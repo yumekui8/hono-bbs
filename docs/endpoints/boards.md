@@ -7,66 +7,68 @@
 板 (Board) の一覧取得・作成・更新・削除を行う。
 板は掲示板の最上位コンテナであり、スレッドと投稿を格納する。
 
-### 役割・実装の説明
+### 板の権限制御
 
-`GET /boards` は全板の一覧を返すが、読み取り権限のない板は除外される (権限フィルタリング)。
-板作成 (`POST /boards`) は `ENDPOINT_PERMISSIONS` の `/boards` 設定に基づいて権限チェックを行う。
-デフォルトでは `bbs-admin-group` メンバーのみ板を作成できる。
-
-### 権限フィルタリング
-
+板の `permissions` フィールドで閲覧・書き込みを制御する。
 `GET /boards` では、クライアントが GET 権限を持たない板はレスポンスから除外される。
-`bbs-admin-group` メンバーは全板を参照可能 (`isAdmin=true`)。
+sys admin (`admin-role` メンバー) は権限チェックをバイパスして全板を参照・操作できる。
+
+板の作成 (`POST /boards`) は sys admin のみ実行できる。
+板の更新・削除は当該板の PUT/PATCH/DELETE 権限が必要。
 
 ### Board スキーマ
 
-```json
+```jsonc
 {
-  "type": "object",
-  "properties": {
-    "id":                             { "type": "string" },
-    "ownerUserId":                    { "type": ["string", "null"] },
-    "ownerGroupId":                   { "type": ["string", "null"] },
-    "permissions":                    { "type": "string", "description": "\"owner,group,auth,anon\" 形式のビットマスク" },
-    "name":                           { "type": "string" },
-    "description":                    { "type": ["string", "null"] },
-    "maxThreads":                     { "type": "integer" },
-    "maxThreadTitleLength":           { "type": "integer" },
-    "defaultMaxPosts":                { "type": "integer" },
-    "defaultMaxPostLength":           { "type": "integer" },
-    "defaultMaxPostLines":            { "type": "integer" },
-    "defaultMaxPosterNameLength":     { "type": "integer" },
-    "defaultMaxPosterSubInfoLength":  { "type": "integer" },
-    "defaultMaxPosterMetaInfoLength": { "type": "integer" },
-    "defaultPosterName":              { "type": "string" },
-    "defaultIdFormat": {
-      "type": "string",
-      "enum": ["daily_hash", "daily_hash_or_user", "api_key_hash", "api_key_hash_or_user", "none"]
-    },
-    "defaultThreadOwnerUserId":   { "type": ["string", "null"] },
-    "defaultThreadOwnerGroupId":  { "type": ["string", "null"] },
-    "defaultThreadPermissions":   { "type": "string" },
-    "category":                   { "type": ["string", "null"], "description": "カテゴリ / タグ。省略可、最大128文字" },
-    "createdAt":                  { "type": "string", "format": "date-time" },
-    "adminMeta": {
-      "type": "object",
-      "description": "user-admin-group または bbs-admin-group メンバーのみ付与",
-      "properties": {
-        "creatorUserId":             { "type": ["string", "null"] },
-        "creatorSessionId":          { "type": ["string", "null"] },
-        "creatorTurnstileSessionId": { "type": ["string", "null"] }
-      }
-    }
+  "id": "general",
+  "administrators": "admin,moderator-role",  // カンマ区切りの userId/roleId
+  "members": "",
+  "permissions": "31,28,24,16",  // admins,members,users,anon (各値 0-31)
+  "name": "雑談板",
+  "description": "なんでも話せる板です",
+  "maxThreads": 1000,               // 0=無制限
+  "maxThreadTitleLength": 200,      // 0=無制限
+  "defaultMaxPosts": 1000,          // 0=無制限
+  "defaultMaxPostLength": 2000,     // 0=無制限
+  "defaultMaxPostLines": 100,       // 0=無制限
+  "defaultMaxPosterNameLength": 50, // 0=無制限
+  "defaultMaxPosterOptionLength": 100, // 0=無制限 (メール欄等)
+  "defaultPosterName": "名無しさん",
+  "defaultIdFormat": "daily_hash",  // 匿名IDのフォーマット
+  // スレッド作成時の初期値テンプレート ($CREATOR, $PARENTS が使用可)
+  "defaultThreadAdministrators": "$CREATOR",
+  "defaultThreadMembers": "",
+  "defaultThreadPermissions": "31,28,24,16",
+  // 投稿作成時の初期値テンプレート ($CREATOR, $PARENTS が使用可)
+  "defaultPostAdministrators": "$CREATOR",
+  "defaultPostMembers": "",
+  "defaultPostPermissions": "31,28,24,16",
+  "category": "雑談",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  // adminMeta: admin-role または user-admin-role メンバーのみ返却
+  "adminMeta": {
+    "creatorUserId": "admin",
+    "creatorSessionId": null,
+    "creatorTurnstileSessionId": null
   }
 }
 ```
+
+#### defaultIdFormat の値
+
+| 値 | 説明 |
+|---|---|
+| `daily_hash` | 全員: IP+日付のハッシュ (日替わり ID) |
+| `daily_hash_or_user` | 匿名: 日替わりハッシュ / ログイン済み: ユーザーID |
+| `api_key_hash` | 全員: X-User-Token ヘッダーのハッシュ |
+| `api_key_hash_or_user` | 匿名: トークンハッシュ / ログイン済み: ユーザーID |
+| `none` | ID を表示しない |
 
 ---
 
 ## `GET /boards`
 
 板の一覧を取得する。読み取り権限のない板は除外される。
-`endpoint` フィールドに `/boards` コレクションの権限情報が含まれる。
 
 ### 認証
 
@@ -78,22 +80,7 @@
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "data": {
-      "type": "array",
-      "items": { "$ref": "#/Board" }
-    },
-    "endpoint": {
-      "type": "object",
-      "description": "/boards コレクションの ownership 情報",
-      "properties": {
-        "ownerUserId":  { "type": ["string", "null"] },
-        "ownerGroupId": { "type": ["string", "null"] },
-        "permissions":  { "type": "string" }
-      }
-    }
-  }
+  "data": [ /* Board オブジェクトの配列 */ ]
 }
 ```
 
@@ -101,88 +88,83 @@
 
 ## `POST /boards`
 
-板を作成する。`ENDPOINT_PERMISSIONS` の `/boards` 設定に基づく POST 権限チェックを行う。
-デフォルト: `bbs-admin-group` メンバーのみ作成可能。
+板を作成する。**sys admin (`admin-role` メンバー) のみ** 作成可能。
 
 ### 認証
 
+- `X-Session-Id` 必須 (sys admin でログイン)
 - `X-Turnstile-Session` 必須
-- `X-Session-Id` 必須 (デフォルト権限では bbs-admin-group へのログインが必要)
 
-### リクエスト
+### リクエストボディ
 
-```json
+```jsonc
 {
-  "type": "object",
-  "required": ["name"],
-  "properties": {
-    "id":                          { "type": "string", "description": "省略時は UUID 自動生成。英数字・_・-・. のみ" },
-    "name":                        { "type": "string", "maxLength": 100 },
-    "description":                 { "type": ["string", "null"], "maxLength": 500 },
-    "ownerUserId":                 { "type": "string", "description": "省略時は作成者のユーザID" },
-    "ownerGroupId":                { "type": "string", "description": "省略時は作成者のプライマリグループ" },
-    "permissions":                 { "type": "string", "default": "15,14,12,12", "description": "\"owner,group,auth,anon\" 形式" },
-    "maxThreads":                  { "type": "integer", "default": 1000, "minimum": 1, "maximum": 100000 },
-    "maxThreadTitleLength":        { "type": "integer", "default": 200, "minimum": 1, "maximum": 1000 },
-    "defaultMaxPosts":             { "type": "integer", "default": 1000, "minimum": 1 },
-    "defaultMaxPostLength":        { "type": "integer", "default": 2000, "minimum": 1 },
-    "defaultMaxPostLines":         { "type": "integer", "default": 100, "minimum": 1 },
-    "defaultMaxPosterNameLength":  { "type": "integer", "default": 50, "minimum": 1 },
-    "defaultMaxPosterSubInfoLength":  { "type": "integer", "default": 100, "minimum": 1 },
-    "defaultMaxPosterMetaInfoLength": { "type": "integer", "default": 200, "minimum": 1 },
-    "defaultPosterName":           { "type": "string", "default": "名無し", "maxLength": 50 },
-    "defaultIdFormat":             { "type": "string", "default": "daily_hash" },
-    "defaultThreadOwnerUserId":    { "type": ["string", "null"] },
-    "defaultThreadOwnerGroupId":   { "type": ["string", "null"] },
-    "defaultThreadPermissions":    { "type": "string", "default": "15,14,12,12" },
-    "category":                    { "type": "string", "maxLength": 128, "description": "カテゴリ / タグ (省略可)" }
-  }
+  // 板ID (省略時は UUID 自動生成。英数字・_・-・. のみ、最大 100 文字)
+  "id": "general",
+  "name": "雑談板",                      // 必須、最大 100 文字
+  "description": "なんでも話せる板です", // 最大 1000 文字
+  "administrators": "$CREATOR",          // 省略時は作成者 userId が設定される
+  "members": "",
+  "permissions": "31,28,24,16",
+  "maxThreads": 1000,
+  "maxThreadTitleLength": 200,
+  "defaultMaxPosts": 1000,
+  "defaultMaxPostLength": 2000,
+  "defaultMaxPostLines": 100,
+  "defaultMaxPosterNameLength": 50,
+  "defaultMaxPosterOptionLength": 100,
+  "defaultPosterName": "名無しさん",
+  "defaultIdFormat": "daily_hash",
+  "defaultThreadAdministrators": "$CREATOR",
+  "defaultThreadMembers": "",
+  "defaultThreadPermissions": "31,28,24,16",
+  "defaultPostAdministrators": "$CREATOR",
+  "defaultPostMembers": "",
+  "defaultPostPermissions": "31,28,24,16",
+  "category": "雑談"
 }
 ```
 
+`name`、`description`、`permissions`、`maxThreads`、`maxThreadTitleLength`、
+`defaultMaxPosts`、`defaultMaxPostLength`、`defaultMaxPostLines`、
+`defaultMaxPosterNameLength`、`defaultMaxPosterOptionLength`、`defaultPosterName`、
+`defaultIdFormat`、`defaultThreadAdministrators`、`defaultThreadPermissions`、
+`defaultPostAdministrators`、`defaultPostPermissions` は必須フィールド。
+
 ### レスポンス
 
-- `201 Created` — `Board` オブジェクト
+- `201 Created` — 作成した `Board` オブジェクト
 
 ### エラー
 
 | コード | HTTP | 説明 |
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | バリデーション失敗 |
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
-| `FORBIDDEN` | 403 | 権限不足 |
+| `FORBIDDEN` | 403 | sys admin でない |
 
 ---
 
 ## `PUT /boards/:boardId`
 
-板のメタ情報を更新する。板の PUT 権限が必要。
+板の表示情報 (`name`、`description`、`category`) のみを更新する。
+板の **PUT 権限**が必要。権限設定や制限値を変更したい場合は `PATCH` を使用する。
 
 ### 認証
 
+- `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `X-Session-Id` — 権限によっては必要
 
-### リクエスト
+### リクエストボディ
 
-```json
+```jsonc
 {
-  "type": "object",
-  "properties": {
-    "name":                 { "type": "string", "maxLength": 100 },
-    "description":          { "type": ["string", "null"] },
-    "ownerUserId":          { "type": ["string", "null"] },
-    "ownerGroupId":         { "type": ["string", "null"] },
-    "permissions":          { "type": "string" },
-    "maxThreads":           { "type": "integer", "minimum": 1 },
-    "defaultMaxPosts":      { "type": "integer", "minimum": 1 },
-    "defaultMaxPostLength": { "type": "integer", "minimum": 1 },
-    "defaultPosterName":    { "type": "string", "maxLength": 50 },
-    "defaultIdFormat":      { "type": "string" },
-    "category":             { "type": ["string", "null"], "maxLength": 128, "description": "カテゴリ / タグ。null で削除" }
-  }
+  "name": "新しい板名",       // 最大 100 文字
+  "description": "説明文",    // 最大 1000 文字
+  "category": "カテゴリ名"    // 最大 128 文字
 }
 ```
+
+すべてのフィールドは省略可能。指定したフィールドのみ更新される。
 
 ### レスポンス
 
@@ -193,20 +175,49 @@
 | コード | HTTP | 説明 |
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | バリデーション失敗 |
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
 | `FORBIDDEN` | 403 | 権限不足 |
 | `BOARD_NOT_FOUND` | 404 | 板が存在しない |
 
 ---
 
-## `DELETE /boards/:boardId`
+## `PATCH /boards/:boardId`
 
-板を削除する。CASCADE でスレッド・投稿も削除される。板の DELETE 権限が必要。
+板の全フィールドを更新する (upsert)。
+
+- **板が存在する場合**: 板の **PATCH 権限**が必要。全フィールドを上書き更新する。
+- **板が存在しない場合**: **sys admin のみ** 新規作成できる (指定した `:boardId` で作成)。
 
 ### 認証
 
+- `X-Session-Id` 必須
 - `X-Turnstile-Session` 必須
-- `X-Session-Id` — 権限によっては必要
+
+### リクエストボディ
+
+`POST /boards` と同じスキーマ。`id` フィールドは無視され、URL の `:boardId` が使われる。
+
+### レスポンス
+
+- `200 OK` — 更新後または作成した `Board` オブジェクト
+
+### エラー
+
+| コード | HTTP | 説明 |
+|---|---|---|
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
+| `FORBIDDEN` | 403 | 権限不足 (板が存在しない場合は sys admin でない) |
+| `BOARD_NOT_FOUND` | 404 | 板が存在しない (PATCH 時の内部エラー) |
+
+---
+
+## `DELETE /boards/:boardId`
+
+板を削除する。CASCADE でスレッド・投稿も削除される。板の **DELETE 権限**が必要。
+
+### 認証
+
+- `X-Session-Id` 必須
+- `X-Turnstile-Session` 必須
 
 ### レスポンス
 
@@ -216,6 +227,5 @@
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `UNAUTHORIZED` | 401 | Turnstile セッション無効 |
 | `FORBIDDEN` | 403 | 権限不足 |
 | `BOARD_NOT_FOUND` | 404 | 板が存在しない |

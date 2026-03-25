@@ -11,7 +11,6 @@
 
 `X-Session-Id` から現在のユーザを特定し、そのユーザのみ操作できる。
 `id` (ログインID) および `isActive` フラグは変更不可。
-パスワード変更は `PUT /profile` の `currentPassword`/`newPassword` フィールドで行う。
 アカウント削除後も投稿は残り、`userId` が `null` になる。
 管理者ユーザ (`admin`) は削除不可。
 
@@ -20,7 +19,6 @@
 ## `GET /profile`
 
 ログイン中のユーザ自身の情報を取得する。
-`endpoint` フィールドに `/profile` エンドポイントの権限情報が含まれる。
 
 ### 認証
 
@@ -32,25 +30,15 @@
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "data": {
-      "type": "object",
-      "properties": {
-        "id":             { "type": "string", "description": "ログインID兼表示ID。変更不可" },
-        "displayName":    { "type": "string" },
-        "bio":            { "type": ["string", "null"] },
-        "email":          { "type": ["string", "null"] },
-        "isActive":       { "type": "boolean" },
-        "primaryGroupId": { "type": ["string", "null"] },
-        "createdAt":      { "type": "string", "format": "date-time" },
-        "updatedAt":      { "type": "string", "format": "date-time" }
-      }
-    },
-    "endpoint": {
-      "type": "object",
-      "description": "/profile エンドポイントの ownership 情報"
-    }
+  "data": {
+    "id":            "string  // ログインID兼表示ID。変更不可",
+    "displayName":   "string",
+    "bio":           "string | null",
+    "email":         "string | null",
+    "isActive":      "boolean",
+    "primaryRoleId": "string | null",
+    "createdAt":     "string  // ISO 8601",
+    "updatedAt":     "string  // ISO 8601"
   }
 }
 ```
@@ -67,7 +55,6 @@
 ## `PUT /profile`
 
 ログイン中のユーザ自身のプロフィールを更新する。`id` と `isActive` は変更不可。
-`currentPassword` と `newPassword` を両方指定するとパスワード変更も同時に行える。
 
 ### 認証
 
@@ -80,16 +67,12 @@
 {
   "type": "object",
   "properties": {
-    "displayName":     { "type": "string", "description": "0〜128文字" },
-    "bio":             { "type": ["string", "null"], "description": "0〜500文字。null で削除" },
-    "email":           { "type": ["string", "null"], "description": "メールアドレス形式。null で削除" },
-    "currentPassword": { "type": "string", "description": "パスワード変更時: 現在のパスワード (newPassword と一緒に指定)" },
-    "newPassword":     { "type": "string", "minLength": 8, "maxLength": 128, "description": "パスワード変更時: 新しいパスワード (currentPassword と一緒に指定)" }
+    "displayName": { "type": "string",           "description": "0〜128文字" },
+    "bio":         { "type": ["string", "null"],  "description": "0〜500文字。null で削除" },
+    "email":       { "type": ["string", "null"],  "description": "メールアドレス形式。null で削除" }
   }
 }
 ```
-
-`currentPassword` と `newPassword` は両方指定するか両方省略するかのどちらか。片方だけ指定するとバリデーションエラー。
 
 ### レスポンス
 
@@ -99,7 +82,43 @@
 
 | コード | HTTP | 説明 |
 |---|---|---|
-| `VALIDATION_ERROR` | 400 | バリデーション失敗 (currentPassword/newPassword は両方必要) |
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
+| `UNAUTHORIZED` | 401 | 未ログイン / Turnstile セッション無効 |
+| `USER_NOT_FOUND` | 404 | ユーザが存在しない |
+
+---
+
+## `PUT /profile/password`
+
+ログイン中のユーザのパスワードを変更する。現在のパスワードによる確認が必要。
+
+### 認証
+
+- `X-Session-Id` 必須
+- `X-Turnstile-Session` 必須
+
+### リクエスト
+
+```json
+{
+  "type": "object",
+  "required": ["currentPassword", "newPassword"],
+  "properties": {
+    "currentPassword": { "type": "string", "description": "現在のパスワード" },
+    "newPassword":     { "type": "string", "minLength": 8, "maxLength": 128, "description": "新しいパスワード" }
+  }
+}
+```
+
+### レスポンス
+
+- `204 No Content`
+
+### エラー
+
+| コード | HTTP | 説明 |
+|---|---|---|
+| `VALIDATION_ERROR` | 400 | バリデーション失敗 |
 | `INVALID_PASSWORD` | 400 | currentPassword が正しくない |
 | `UNAUTHORIZED` | 401 | 未ログイン / Turnstile セッション無効 |
 | `USER_NOT_FOUND` | 404 | ユーザが存在しない |

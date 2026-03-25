@@ -1,62 +1,106 @@
-// パーミッション形式: "owner,group,auth,anon"
-// 各値は操作ビットマスク: DELETE=1, PUT=2, POST=4, GET=8
-// 例: "15,12,12,8" → owner: 全操作, group: GET+POST+PUT, auth: GET+POST, anon: GETのみ
+// パーミッション形式: "admins,members,users,anon"
+// 各値は操作ビットマスク: GET=16, POST=8, PUT=4, PATCH=2, DELETE=1
+// 例: "31,28,24,16" → admins: 全操作, members: GET+POST+PUT, users: GET+POST, anon: GETのみ
 //
-// 注意: 4操作のビットマスクは 0〜15 の範囲 (2^4 = 16 通りの組み合わせ)
-// 「全操作許可」= 15 (DELETE+PUT+POST+GET = 1+2+4+8 = 15)
-// 「GETのみ」   =  8
+// 階層: admins ⊇ members ⊇ users ⊇ anon
+// (各レベルは下位のビットを OR で継承)
 
-export type Operation = 'GET' | 'POST' | 'PUT' | 'DELETE'
+export type Operation = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-// パーミッション文字列を各ユーザ種別のマスクに分解
-export function parsePermissions(perms: string): { owner: number; group: number; auth: number; anon: number } {
+const OP_BIT: Record<Operation, number> = { GET: 16, POST: 8, PUT: 4, PATCH: 2, DELETE: 1 }
+
+export function parsePermissions(perms: string): { admin: number; member: number; user: number; anon: number } {
   const parts = perms.split(',').map(Number)
   return {
-    owner: parts[0] ?? 15,
-    group: parts[1] ?? 15,
-    auth:  parts[2] ?? 12,  // デフォルト: GET+POST
-    anon:  parts[3] ?? 8,   // デフォルト: GET のみ
+    admin:  parts[0] ?? 31,
+    member: parts[1] ?? 28,
+    user:   parts[2] ?? 24,
+    anon:   parts[3] ?? 16,
   }
 }
 
-export function formatPermissions(owner: number, group: number, auth: number, anon: number): string {
-  return `${owner},${group},${auth},${anon}`
+export function formatPermissions(admin: number, member: number, user: number, anon: number): string {
+  return `${admin},${member},${user},${anon}`
+}
+
+function splitList(s: string): string[] {
+  return s.split(',').map(t => t.trim()).filter(Boolean)
+}
+
+function inList(userId: string | null, roleIds: string[], list: string[]): boolean {
+  if (!userId) return false
+  if (list.includes(userId)) return true
+  return roleIds.some(r => list.includes(r))
 }
 
 // 指定操作の権限を持つか確認
-// isAdmin=true の場合は常に許可
+// isSysAdmin=true の場合は常に許可 (全権限バイパス)
 export function hasPermission(params: {
   userId: string | null
-  userGroupIds: string[]
-  ownerUserId: string | null
-  ownerGroupId: string | null
+  userRoleIds: string[]
+  administrators: string
+  members: string
   permissions: string
   operation: Operation
-  isAdmin: boolean
+  isSysAdmin: boolean
 }): boolean {
-  if (params.isAdmin) return true
+  if (params.isSysAdmin) return true
 
   const parsed = parsePermissions(params.permissions)
+  const bit = OP_BIT[params.operation]
 
-  // 操作ビット: DELETE=1, PUT=2, POST=4, GET=8
-  const opBit: Record<Operation, number> = { DELETE: 1, PUT: 2, POST: 4, GET: 8 }
-  const bit = opBit[params.operation]
-
-  // オーナーチェック (userId が一致する場合)
-  if (params.userId && params.userId === params.ownerUserId) {
-    return (parsed.owner & bit) !== 0
+  // Administrators チェック (admin | member | user | anon の継承)
+  const adminList = splitList(params.administrators)
+  if (inList(params.userId, params.userRoleIds, adminList)) {
+    return ((parsed.admin | parsed.member | parsed.user | parsed.anon) & bit) !== 0
   }
 
-  // グループチェック (ownerGroupId が userGroupIds に含まれる場合)
-  if (params.ownerGroupId && params.userGroupIds.includes(params.ownerGroupId)) {
-    return (parsed.group & bit) !== 0
+  // Members チェック (member | user | anon の継承)
+  const memberList = splitList(params.members)
+  if (inList(params.userId, params.userRoleIds, memberList)) {
+    return ((parsed.member | parsed.user | parsed.anon) & bit) !== 0
   }
 
-  // ログイン済みユーザー
+  // ログイン済みユーザ (Users: user | anon の継承)
   if (params.userId) {
-    return (parsed.auth & bit) !== 0
+    return ((parsed.user | parsed.anon) & bit) !== 0
   }
 
-  // 匿名ユーザー
+  // 匿名
   return (parsed.anon & bit) !== 0
+}
+
+// $CREATOR / $PARENTS テンプレートを展開して administrators/members 文字列を生成する
+// creator: 作成者のユーザID (null の場合は匿名、$CREATOR はスキップ)
+// parents: 親リソースの administrators または members の文字列 ($PARENTS に展開)
+export function expandTemplate(
+  template: string,
+  creator: string | null,
+  parents: string,
+): string {
+  const parts = splitList(template)
+  const result: string[] = []
+
+  for (const part of parts) {
+    if (part === '$CREATOR') {
+      if (creator) result.push(creator)
+    } else if (part === '$PARENTS') {
+      result.push(...splitList(parents))
+    } else {
+      result.push(part)
+    }
+  }
+
+  // 重複排除して返す
+  return [...new Set(result)].join(',')
+}
+
+// permissions 文字列の各値が 0-31 の範囲内か検証
+export function isValidPermissions(perms: string): boolean {
+  const parts = perms.split(',')
+  if (parts.length !== 4) return false
+  return parts.every(p => {
+    const n = parseInt(p, 10)
+    return !isNaN(n) && n >= 0 && n <= 31
+  })
 }

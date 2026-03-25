@@ -1,23 +1,16 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import {
-  getSetupInfoHandler,
   setupHandler,
-  getLoginInfoHandler,
   loginHandler,
-  getLogoutInfoHandler,
   logoutHandler,
 } from '../handlers/authHandler'
+import { requireLogin } from '../middleware/auth'
 
 const auth = new Hono<AppEnv>()
 
-auth.get('/setup', getSetupInfoHandler)
 auth.post('/setup', setupHandler)
-
-auth.get('/login', getLoginInfoHandler)
 auth.post('/login', loginHandler)
-
-auth.get('/logout', getLogoutInfoHandler)
-auth.post('/logout', logoutHandler)
+auth.post('/logout', requireLogin, logoutHandler)
 
 export default auth

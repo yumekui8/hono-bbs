@@ -3,31 +3,6 @@ import { isZodError, zodMessage } from '../utils/zodHelper'
 import type { AppEnv } from '../types'
 import * as authService from '../services/authService'
 import { getSystemIds } from '../utils/constants'
-import { parseEndpointPermissions, getEndpointPermConfig } from '../utils/endpointPermissions'
-
-// GET /auth/setup - セットアップエンドポイントの権限情報を返す
-export async function getSetupInfoHandler(c: Context<AppEnv>): Promise<Response> {
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-  const config = getEndpointPermConfig('/auth/setup', customPerms, sysIds)
-  return c.json({ data: config })
-}
-
-// GET /auth/login - ログインエンドポイントの権限情報を返す
-export async function getLoginInfoHandler(c: Context<AppEnv>): Promise<Response> {
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-  const config = getEndpointPermConfig('/auth/login', customPerms, sysIds)
-  return c.json({ data: config })
-}
-
-// GET /auth/logout - ログアウトエンドポイントの権限情報を返す
-export async function getLogoutInfoHandler(c: Context<AppEnv>): Promise<Response> {
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-  const config = getEndpointPermConfig('/auth/logout', customPerms, sysIds)
-  return c.json({ data: config })
-}
 
 // POST /auth/setup - admin 初期パスワード設定 (一回限り)
 export async function setupHandler(c: Context<AppEnv>): Promise<Response> {

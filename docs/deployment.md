@@ -65,8 +65,17 @@ npx wrangler d1 execute hono-bbs-db --local --file=schema/init.sql
 
 ```bash
 npx wrangler secret put ADMIN_INITIAL_PASSWORD
-npx wrangler secret put TURNSTILE_SECRET_KEY  # Turnstile を使用する場合
 ```
+
+Turnstile セッション検証を有効にする場合は `wrangler.jsonc` の `vars` に追加します:
+
+```jsonc
+"vars": {
+  "ENABLE_TURNSTILE": "true"
+}
+```
+
+> **Note**: `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` は **turnstileApiToken プラグイン** 側の設定です。hono-bbs 本体は `ENABLE_TURNSTILE` と `SESSION_KV` のみを参照します。
 
 #### 6. デプロイ
 
@@ -147,9 +156,8 @@ API_BASE_PATH=/api/v1
 ADMIN_INITIAL_PASSWORD=your-secure-password
 CORS_ORIGIN=https://your-frontend.example.com
 
-# Turnstile (使用する場合)
-# TURNSTILE_SITE_KEY=your-site-key
-# TURNSTILE_SECRET_KEY=your-secret-key
+# Turnstile セッション検証を有効にする場合 (turnstileApiToken プラグインと連携時)
+# ENABLE_TURNSTILE=true
 ```
 
 #### 3. DB の初期化

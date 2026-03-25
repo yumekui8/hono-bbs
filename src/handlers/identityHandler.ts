@@ -71,7 +71,7 @@ export async function updateUserHandler(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-// DELETE /identity/users/:id (userAdminGroup 専用)
+// DELETE /identity/users/:id (userAdminRole 専用)
 export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
   const targetId = c.req.param('id')
   const sysIds = getSystemIds(c.env)
@@ -87,105 +87,105 @@ export async function deleteUserHandler(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
-// ── グループ操作 ──────────────────────────────────────────
+// ── ロール操作 ──────────────────────────────────────────
 
-// GET /identity/groups?page=<n>
-export async function listGroupsHandler(c: Context<AppEnv>): Promise<Response> {
+// GET /identity/roles?page=<n>
+export async function listRolesHandler(c: Context<AppEnv>): Promise<Response> {
   const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10))
-  const limit = getLimit(c.env.GROUP_DISPLAY_LIMIT)
-  const groups = await identityService.listGroups(c.get('db'), page, limit)
-  return c.json({ data: groups, page, limit })
+  const limit = getLimit(c.env.ROLE_DISPLAY_LIMIT)
+  const roles = await identityService.listRoles(c.get('db'), page, limit)
+  return c.json({ data: roles, page, limit })
 }
 
-// GET /identity/groups/:id
-export async function getGroupHandler(c: Context<AppEnv>): Promise<Response> {
-  const groupId = c.req.param('id')
-  const group = await identityService.getGroup(c.get('db'), groupId)
-  if (!group) return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
-  return c.json({ data: group })
+// GET /identity/roles/:id
+export async function getRoleHandler(c: Context<AppEnv>): Promise<Response> {
+  const roleId = c.req.param('id')
+  const role = await identityService.getRole(c.get('db'), roleId)
+  if (!role) return c.json({ error: 'ROLE_NOT_FOUND', message: 'Role not found' }, 404)
+  return c.json({ data: role })
 }
 
-// POST /identity/groups
-export async function createGroupHandler(c: Context<AppEnv>): Promise<Response> {
+// POST /identity/roles
+export async function createRoleHandler(c: Context<AppEnv>): Promise<Response> {
   try {
     const body = await c.req.json()
-    const input = identityService.parseGroup(body)
-    const group = await identityService.createGroup(c.get('db'), input)
-    return c.json({ data: group }, 201)
+    const input = identityService.parseRole(body)
+    const role = await identityService.createRole(c.get('db'), input)
+    return c.json({ data: role }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
-    if (e instanceof Error && e.message === 'GROUP_NAME_TAKEN') {
-      return c.json({ error: 'GROUP_NAME_TAKEN', message: 'Group name is already taken' }, 409)
+    if (e instanceof Error && e.message === 'ROLE_NAME_TAKEN') {
+      return c.json({ error: 'ROLE_NAME_TAKEN', message: 'Role name is already taken' }, 409)
     }
     throw e
   }
 }
 
-// PUT /identity/groups/:id
-export async function updateGroupHandler(c: Context<AppEnv>): Promise<Response> {
-  const groupId = c.req.param('id')
+// PUT /identity/roles/:id
+export async function updateRoleHandler(c: Context<AppEnv>): Promise<Response> {
+  const roleId = c.req.param('id')
   const sysIds = getSystemIds(c.env)
   try {
     const body = await c.req.json()
-    const input = identityService.parseGroup(body)
-    const group = await identityService.updateGroup(c.get('db'), groupId, input, sysIds)
-    if (!group) return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
-    return c.json({ data: group })
+    const input = identityService.parseRole(body)
+    const role = await identityService.updateRole(c.get('db'), roleId, input, sysIds)
+    if (!role) return c.json({ error: 'ROLE_NOT_FOUND', message: 'Role not found' }, 404)
+    return c.json({ data: role })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error) {
-      if (e.message === 'GROUP_NOT_FOUND') return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
-      if (e.message === 'CANNOT_MODIFY_SYSTEM_GROUP') return c.json({ error: 'FORBIDDEN', message: 'Cannot modify system group' }, 403)
+      if (e.message === 'ROLE_NOT_FOUND') return c.json({ error: 'ROLE_NOT_FOUND', message: 'Role not found' }, 404)
+      if (e.message === 'CANNOT_MODIFY_SYSTEM_ROLE') return c.json({ error: 'FORBIDDEN', message: 'Cannot modify system role' }, 403)
     }
     throw e
   }
 }
 
-// DELETE /identity/groups/:id
-export async function deleteGroupHandler(c: Context<AppEnv>): Promise<Response> {
-  const groupId = c.req.param('id')
+// DELETE /identity/roles/:id
+export async function deleteRoleHandler(c: Context<AppEnv>): Promise<Response> {
+  const roleId = c.req.param('id')
   const sysIds = getSystemIds(c.env)
   try {
-    await identityService.deleteGroup(c.get('db'), groupId, sysIds)
+    await identityService.deleteRole(c.get('db'), roleId, sysIds)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
-      if (e.message === 'GROUP_NOT_FOUND') return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
-      if (e.message === 'CANNOT_DELETE_SYSTEM_GROUP') return c.json({ error: 'FORBIDDEN', message: 'Cannot delete system group' }, 403)
+      if (e.message === 'ROLE_NOT_FOUND') return c.json({ error: 'ROLE_NOT_FOUND', message: 'Role not found' }, 404)
+      if (e.message === 'CANNOT_DELETE_SYSTEM_ROLE') return c.json({ error: 'FORBIDDEN', message: 'Cannot delete system role' }, 403)
     }
     throw e
   }
 }
 
-// POST /identity/groups/:id/members
-export async function addGroupMemberHandler(c: Context<AppEnv>): Promise<Response> {
-  const groupId = c.req.param('id')
+// POST /identity/roles/:id/members
+export async function addRoleMemberHandler(c: Context<AppEnv>): Promise<Response> {
+  const roleId = c.req.param('id')
   const body = await c.req.json<{ userId?: string }>()
   if (!body.userId) {
     return c.json({ error: 'VALIDATION_ERROR', message: 'userId is required' }, 400)
   }
   try {
-    await identityService.addGroupMember(c.get('db'), groupId, body.userId)
+    await identityService.addRoleMember(c.get('db'), roleId, body.userId)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error) {
-      if (e.message === 'GROUP_NOT_FOUND') return c.json({ error: 'GROUP_NOT_FOUND', message: 'Group not found' }, 404)
+      if (e.message === 'ROLE_NOT_FOUND') return c.json({ error: 'ROLE_NOT_FOUND', message: 'Role not found' }, 404)
       if (e.message === 'USER_NOT_FOUND') return c.json({ error: 'USER_NOT_FOUND', message: 'User not found' }, 404)
     }
     throw e
   }
 }
 
-// DELETE /identity/groups/:id/members/:userId
-export async function removeGroupMemberHandler(c: Context<AppEnv>): Promise<Response> {
-  const groupId = c.req.param('id')
+// DELETE /identity/roles/:id/members/:userId
+export async function removeRoleMemberHandler(c: Context<AppEnv>): Promise<Response> {
+  const roleId = c.req.param('id')
   const userId = c.req.param('userId')
   try {
-    await identityService.removeGroupMember(c.get('db'), groupId, userId)
+    await identityService.removeRoleMember(c.get('db'), roleId, userId)
     return new Response(null, { status: 204 })
   } catch (e) {
     if (e instanceof Error && e.message === 'MEMBER_NOT_FOUND') {
-      return c.json({ error: 'MEMBER_NOT_FOUND', message: 'Member not found in group' }, 404)
+      return c.json({ error: 'MEMBER_NOT_FOUND', message: 'Member not found in role' }, 404)
     }
     throw e
   }

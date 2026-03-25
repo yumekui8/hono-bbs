@@ -5,15 +5,16 @@ type PostRow = {
   id: string
   thread_id: string
   post_number: number
-  owner_user_id: string | null
-  owner_group_id: string | null
+  administrators: string
+  members: string
   permissions: string
-  user_id: string | null
-  display_user_id: string
+  author_id: string
   poster_name: string
-  poster_sub_info: string | null
+  poster_option_info: string
   content: string
   is_deleted: number
+  is_edited: number
+  edited_at: string | null
   created_at: string
   creator_user_id: string | null
   creator_session_id: string | null
@@ -25,15 +26,16 @@ function rowToPost(row: PostRow): Post {
     id: row.id,
     threadId: row.thread_id,
     postNumber: row.post_number,
-    ownerUserId: row.owner_user_id,
-    ownerGroupId: row.owner_group_id,
+    administrators: row.administrators,
+    members: row.members,
     permissions: row.permissions,
-    userId: row.user_id,
-    displayUserId: row.display_user_id,
+    authorId: row.author_id,
     posterName: row.poster_name,
-    posterSubInfo: row.poster_sub_info,
+    posterOptionInfo: row.poster_option_info,
     content: row.content,
     isDeleted: row.is_deleted === 1,
+    isEdited: row.is_edited === 1,
+    editedAt: row.edited_at,
     createdAt: row.created_at,
     adminMeta: {
       creatorUserId: row.creator_user_id,
@@ -54,7 +56,6 @@ export async function findPostsByThreadId(db: DbAdapter, threadId: string): Prom
 export type PostRange = { from: number; to: number | null }
 
 // 複数レンジを OR 結合した単一クエリで取得
-// range.to === null のとき from 以降すべて、それ以外は from～to 包含
 export async function findPostsByRanges(
   db: DbAdapter,
   threadId: string,
@@ -95,7 +96,6 @@ export async function findPostByNumber(
   return row ? rowToPost(row) : null
 }
 
-// スレッド内の次の post_number を取得
 export async function nextPostNumber(db: DbAdapter, threadId: string): Promise<number> {
   const row = await db.first<{ next: number }>(
     'SELECT COALESCE(MAX(post_number), 0) + 1 AS next FROM posts WHERE thread_id = ?',
@@ -106,38 +106,66 @@ export async function nextPostNumber(db: DbAdapter, threadId: string): Promise<n
 
 export async function insertPost(db: DbAdapter, post: Post): Promise<void> {
   await db.run(
-    `
-      INSERT INTO posts (
-        id, thread_id, post_number, owner_user_id, owner_group_id, permissions,
-        user_id, display_user_id, poster_name, poster_sub_info, content, created_at,
-        creator_user_id, creator_session_id, creator_turnstile_session_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
+    `INSERT INTO posts (
+      id, thread_id, post_number, administrators, members, permissions,
+      author_id, poster_name, poster_option_info, content,
+      is_deleted, is_edited, edited_at, created_at,
+      creator_user_id, creator_session_id, creator_turnstile_session_id
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       post.id, post.threadId, post.postNumber,
-      post.ownerUserId, post.ownerGroupId, post.permissions,
-      post.userId, post.displayUserId, post.posterName, post.posterSubInfo,
-      post.content, post.createdAt,
+      post.administrators, post.members, post.permissions,
+      post.authorId, post.posterName, post.posterOptionInfo,
+      post.content, post.isDeleted ? 1 : 0, post.isEdited ? 1 : 0, post.editedAt,
+      post.createdAt,
       post.adminMeta.creatorUserId, post.adminMeta.creatorSessionId, post.adminMeta.creatorTurnstileSessionId,
     ],
   )
 }
 
-// 投稿内容の更新
+// 投稿内容の更新 (PUT: content + isEdited フラグ)
 export async function updatePostContent(
   db: DbAdapter,
   threadId: string,
   postNumber: number,
   content: string,
+  editedAt: string,
 ): Promise<boolean> {
   const result = await db.run(
-    'UPDATE posts SET content = ? WHERE thread_id = ? AND post_number = ?',
-    [content, threadId, postNumber],
+    'UPDATE posts SET content = ?, is_edited = 1, edited_at = ? WHERE thread_id = ? AND post_number = ?',
+    [content, editedAt, threadId, postNumber],
   )
   return result.changes > 0
 }
 
-// 投稿のソフト削除 (is_deleted = 1 に設定)
+// 投稿メタデータの更新 (PATCH)
+export async function patchPost(
+  db: DbAdapter,
+  threadId: string,
+  postNumber: number,
+  updates: {
+    administrators?: string
+    members?: string
+    permissions?: string
+  },
+): Promise<boolean> {
+  const fields: string[] = []
+  const values: unknown[] = []
+
+  if (updates.administrators !== undefined) { fields.push('administrators = ?'); values.push(updates.administrators) }
+  if (updates.members !== undefined)        { fields.push('members = ?');        values.push(updates.members) }
+  if (updates.permissions !== undefined)    { fields.push('permissions = ?');    values.push(updates.permissions) }
+
+  if (fields.length === 0) return true
+  values.push(threadId, postNumber)
+  const result = await db.run(
+    `UPDATE posts SET ${fields.join(', ')} WHERE thread_id = ? AND post_number = ?`,
+    values,
+  )
+  return result.changes > 0
+}
+
+// 投稿のソフト削除
 export async function softDeletePost(
   db: DbAdapter,
   threadId: string,

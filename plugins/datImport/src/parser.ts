@@ -16,18 +16,18 @@ export function parseDat(text: string): DatPost[] {
 function parseDatLine(line: string, isFirst: boolean): DatPost {
   const parts = line.split('<>')
   // 名前・スレタイトルは HTML タグ除去 + エンティティ変換
-  const posterName    = decodeHtmlEntities(stripHtml(parts[0] ?? ''))
-  const posterSubInfo = parts[1] ?? ''
-  const dateAndId     = parts[2] ?? ''
+  const posterName        = decodeHtmlEntities(stripHtml(parts[0] ?? ''))
+  const posterOptionInfo  = parts[1] ?? ''
+  const dateAndId         = parts[2] ?? ''
   // 本文: <br> を改行に変換してから HTML エンティティを変換 (その他タグはそのまま)
-  const content       = decodeHtmlEntities(convertBr(parts[3] ?? ''))
-  const threadTitle   = isFirst ? decodeHtmlEntities(stripHtml(parts[4] ?? '')) : ''
+  const content           = decodeHtmlEntities(convertBr(parts[3] ?? ''))
+  const threadTitle       = isFirst ? decodeHtmlEntities(stripHtml(parts[4] ?? '')) : ''
 
   return {
     posterName,
-    posterSubInfo,
+    posterOptionInfo,
     dateStr: parseDateToIso(dateAndId),
-    displayUserId: extractId(dateAndId),
+    authorId: extractId(dateAndId),
     content,
     threadTitle,
   }

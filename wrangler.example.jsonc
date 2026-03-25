@@ -6,23 +6,25 @@
 	"vars": {
 		// API ベースパス
 		"API_BASE_PATH": "/api/v1",
-		// ユーザ/グループ一覧の 1 ページあたり件数 (0 = 無制限)
+		// ユーザ一覧の 1 ページあたり件数 (0 = 無制限)
 		"USER_DISPLAY_LIMIT": "0",
-		"GROUP_DISPLAY_LIMIT": "0"
-		// ── 以下は wrangler secret put <KEY> で設定することを推奨 ────────────
-		// ADMIN_USERNAME:         管理者ユーザID              (デフォルト: admin)
-		// USER_ADMIN_GROUP:       ユーザ管理グループID         (デフォルト: user-admin-group)
-		// BBS_ADMIN_GROUP:        掲示板管理グループID         (デフォルト: bbs-admin-group)
-		// TURNSTILE_SITE_KEY:     Cloudflare Turnstile サイトキー
-		// TURNSTILE_SECRET_KEY:   Cloudflare Turnstile シークレットキー
-		// ENABLE_TURNSTILE:       'true' で Turnstile 検証を有効化 (デフォルト: 無効)
-		// ADMIN_INITIAL_PASSWORD: admin 初期パスワード         (POST /auth/setup で使用)
-		// TURNSTILE_TOKEN_TTL:    Turnstile セッション有効期限  (分単位, 0=無期限, デフォルト: 525600=1年)
-		// ENDPOINT_PERMISSIONS:   エンドポイント権限 JSON       (省略時はデフォルト値を使用)
-		// MAX_REQUEST_SIZE:       リクエストサイズ上限          (例: "1mb", "500kb")
-		// CORS_ORIGIN:            許可する CORS オリジン        (カンマ区切り、省略時は *)
-		// BBS_ALLOW_DOMAIN:       許可するドメイン              (カンマ区切り、省略時は制限なし)
-		// ALLOW_BBS_UI_DOMAINS:   Turnstile認証後のリダイレクト許可UIドメイン (カンマ区切り)
+		// ロール一覧の 1 ページあたり件数 (0 = 無制限)
+		"ROLE_DISPLAY_LIMIT": "0"
+		// ── 以下は必要に応じて設定 ─────────────────────────────────────────────
+		// CORS_ORIGIN:         許可する CORS オリジン (カンマ区切り、省略時は *)
+		//                      例: "https://your-frontend.example.com"
+		// BBS_ALLOW_DOMAIN:    アクセスを許可するドメイン (カンマ区切り、省略時は制限なし)
+		//                      例: "api.example.com"
+		// MAX_REQUEST_SIZE:    リクエストボディサイズ上限 (例: "1mb", "500kb")
+		// ENABLE_TURNSTILE:    'true' で X-Turnstile-Session ヘッダーの検証を有効化
+		//                      (turnstileApiToken プラグインと組み合わせて使用)
+		// ── 以下は wrangler secret put <KEY> で設定することを推奨 ─────────────
+		// ADMIN_INITIAL_PASSWORD: admin 初期パスワード (POST /auth/setup で使用、設定後削除推奨)
+		// ADMIN_USERNAME:         管理者ユーザ ID (デフォルト: admin)
+		// USER_ADMIN_ROLE:        ユーザ管理ロール ID (デフォルト: user-admin-role)
+		// DELETED_POSTER_NAME:    ソフトデリート済み投稿の名前欄 (デフォルト: あぼーん)
+		// DELETED_CONTENT:        ソフトデリート済み投稿の本文 (デフォルト: このレスは削除されました)
+		// KV_PREFIX:              KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止)
 	},
 	"kv_namespaces": [
 		{

@@ -46,22 +46,21 @@ function parsePostRanges(param: string): PostRange[] | null {
   }
   return ranges
 }
+
 function adminVisible(c: Context<AppEnv>): boolean {
-  return c.get('isAdmin') || c.get('isUserAdmin')
+  return c.get('isSysAdmin') || c.get('isUserAdmin')
 }
 
 function stripThread(thread: Thread, visible: boolean, deletedPosterName: string, deletedContent: string) {
-  const { adminMeta, firstPost, ...rest } = thread
-  // firstPost が存在する場合は adminMeta を同様に制御
-  const strippedFirstPost = firstPost ? stripPost(firstPost, visible, deletedPosterName, deletedContent) : firstPost
-  if (visible) return { ...rest, adminMeta, firstPost: strippedFirstPost }
-  return { ...rest, firstPost: strippedFirstPost }
+  const { adminMeta, ...rest } = thread
+  if (visible) return { ...rest, adminMeta }
+  return rest
 }
 
 // 削除済み投稿のコンテンツをマスク
 function maskDeletedPost(post: Post, deletedPosterName: string, deletedContent: string): Post {
   if (!post.isDeleted) return post
-  return { ...post, posterName: deletedPosterName, posterSubInfo: null, content: deletedContent }
+  return { ...post, posterName: deletedPosterName, posterOptionInfo: '', content: deletedContent }
 }
 
 function stripPost(post: Post, visible: boolean, deletedPosterName: string, deletedContent: string): Post | Omit<Post, 'adminMeta'> {
@@ -75,7 +74,7 @@ function stripPost(post: Post, visible: boolean, deletedPosterName: string, dele
 export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const result = await threadService.getThreadsWithBoard(
-    c.get('db'), boardId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    c.get('db'), boardId, c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
   )
   if (!result) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
   const visible = adminVisible(c)
@@ -109,7 +108,7 @@ export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Res
     ranges = parsed
   }
   const result = await threadService.getThreadWithPosts(
-    c.get('db'), boardId, threadId, c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+    c.get('db'), boardId, threadId, c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     ranges,
   )
   if (!result) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
@@ -132,7 +131,7 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
     const input = threadService.parseCreateThread(body)
     const result = await threadService.createThread(
       c.get('db'), boardId, input,
-      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
@@ -161,16 +160,16 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
   }
 }
 
-// PUT /boards/:boardId/:threadId - スレッド情報更新
-export async function updateThreadHandler(c: Context<AppEnv>): Promise<Response> {
+// PUT /boards/:boardId/:threadId - title/posterName 更新 + isEdited フラグ
+export async function putThreadHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   const threadId = c.req.param('threadId')
   try {
     const body = await c.req.json()
-    const input = threadService.parseUpdateThread(body)
-    const thread = await threadService.updateThread(
+    const input = threadService.parsePutThread(body)
+    const thread = await threadService.putThread(
       c.get('db'), boardId, threadId, input,
-      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!thread) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
     const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
@@ -185,6 +184,32 @@ export async function updateThreadHandler(c: Context<AppEnv>): Promise<Response>
   }
 }
 
+// PATCH /boards/:boardId/:threadId - メタデータ全般更新 (upsert)
+export async function patchThreadHandler(c: Context<AppEnv>): Promise<Response> {
+  const boardId = c.req.param('boardId')
+  const threadId = c.req.param('threadId')
+  try {
+    const body = await c.req.json()
+    const input = threadService.parsePatchThread(body)
+    const thread = await threadService.patchThread(
+      c.get('db'), boardId, threadId, input,
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
+      c.req.header('X-Session-Id') ?? null,
+      c.req.header('X-Turnstile-Session') ?? null,
+    )
+    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
+    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+    return c.json({ data: stripThread(thread, adminVisible(c), dn, dc) })
+  } catch (e) {
+    if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
+    if (e instanceof Error) {
+      if (e.message === 'FORBIDDEN') return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
+      if (e.message === 'BOARD_NOT_FOUND') return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
+    }
+    throw e
+  }
+}
+
 // DELETE /boards/:boardId/:threadId - スレッド削除
 export async function deleteThreadHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
@@ -192,7 +217,7 @@ export async function deleteThreadHandler(c: Context<AppEnv>): Promise<Response>
   try {
     const deleted = await threadService.deleteThread(
       c.get('db'), boardId, threadId,
-      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!deleted) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
     return new Response(null, { status: 204 })

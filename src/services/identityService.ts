@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import type { User, Group } from '../types'
+import type { User, Role } from '../types'
 import type { DbAdapter } from '../adapters/db'
 import type { SystemIds } from '../utils/constants'
 import * as userRepository from '../repository/userRepository'
-import * as groupRepository from '../repository/groupRepository'
+import * as roleRepository from '../repository/roleRepository'
 import { hashPassword, verifyPassword } from '../utils/password'
 
 // ユーザ作成スキーマ (POST /identity/users)
@@ -13,8 +13,6 @@ const createUserSchema = z.object({
   password: z.string().min(8).max(128),
 })
 
-// 一般ユーザが自分自身を更新できるフィールド
-// currentPassword + newPassword は両方指定するかどうか
 const updateProfileSchema = z.object({
   displayName: z.string().max(128).optional(),
   bio: z.string().max(500).optional().nullable(),
@@ -23,7 +21,6 @@ const updateProfileSchema = z.object({
   newPassword: z.string().min(8).max(128).optional(),
 }).refine(
   d => {
-    // currentPassword と newPassword は両方指定するか両方省略するかのどちらか
     const hasCurrent = d.currentPassword !== undefined
     const hasNew = d.newPassword !== undefined
     return hasCurrent === hasNew
@@ -31,7 +28,6 @@ const updateProfileSchema = z.object({
   { message: 'currentPassword と newPassword は両方指定してください' },
 )
 
-// 管理者が任意ユーザを更新できるフィールド (isActive を含む、パスワード変更は不可)
 const updateUserAdminSchema = z.object({
   displayName: z.string().max(128).optional(),
   bio: z.string().max(500).optional().nullable(),
@@ -39,14 +35,14 @@ const updateUserAdminSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
-const groupSchema = z.object({
-  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'グループ名は英数字・_・- のみ使用できます'),
+const roleSchema = z.object({
+  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'ロール名は英数字・_・- のみ使用できます'),
 })
 
 export type CreateUserInput = z.infer<typeof createUserSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 export type UpdateUserAdminInput = z.infer<typeof updateUserAdminSchema>
-export type GroupInput = z.infer<typeof groupSchema>
+export type RoleInput = z.infer<typeof roleSchema>
 
 export function parseCreateUser(data: unknown): CreateUserInput {
   return createUserSchema.parse(data)
@@ -60,13 +56,12 @@ export function parseUpdateUserAdmin(data: unknown): UpdateUserAdminInput {
   return updateUserAdminSchema.parse(data)
 }
 
-export function parseGroup(data: unknown): GroupInput {
-  return groupSchema.parse(data)
+export function parseRole(data: unknown): RoleInput {
+  return roleSchema.parse(data)
 }
 
 // ── ユーザ操作 ────────────────────────────────────────────
 
-// ユーザ新規作成 (Turnstile 必須の POST /identity/users)
 export async function createUser(
   db: DbAdapter,
   input: CreateUserInput,
@@ -79,14 +74,13 @@ export async function createUser(
   const passwordHash = await hashPassword(input.password)
   const displayName = input.displayName ?? input.id
 
-  // 新規ユーザは generalGroup をプライマリグループとして所属させる
-  await userRepository.insertUser(db, input.id, displayName, passwordHash, sysIds.generalGroupId, now)
-  await groupRepository.insertUserGroup(db, input.id, sysIds.generalGroupId)
+  // 新規ユーザは generalRole をプライマリロールとして所属させる
+  await userRepository.insertUser(db, input.id, displayName, passwordHash, sysIds.generalRoleId, now)
+  await roleRepository.insertUserRole(db, input.id, sysIds.generalRoleId)
 
   return (await userRepository.findUserById(db, input.id))!
 }
 
-// ユーザ一覧 (ページネーション対応)
 export async function listUsers(db: DbAdapter, page: number, limit: number): Promise<User[]> {
   return userRepository.listUsers(db, page, limit)
 }
@@ -101,13 +95,11 @@ export async function getUser(
   return userRepository.findUserById(db, targetUserId)
 }
 
-// 自分のプロフィール更新 (パスワード変更も同時に可能)
 export async function updateProfile(
   db: DbAdapter,
   userId: string,
   input: UpdateProfileInput,
 ): Promise<User | null> {
-  // パスワード変更が要求された場合
   if (input.currentPassword !== undefined && input.newPassword !== undefined) {
     const result = await userRepository.findUserByIdWithHash(db, userId)
     if (!result) throw new Error('USER_NOT_FOUND')
@@ -127,7 +119,6 @@ export async function updateProfile(
   return userRepository.findUserById(db, userId)
 }
 
-// 管理者による任意ユーザ更新 (isActive 変更可)
 export async function updateUser(
   db: DbAdapter,
   targetUserId: string,
@@ -168,75 +159,70 @@ export async function deleteMe(
   if (!deleted) throw new Error('USER_NOT_FOUND')
 }
 
-// ── グループ操作 ──────────────────────────────────────────
+// ── ロール操作 ──────────────────────────────────────────
 
-export async function listGroups(db: DbAdapter, page: number, limit: number): Promise<Group[]> {
-  return groupRepository.listGroups(db, page, limit)
+export async function listRoles(db: DbAdapter, page: number, limit: number): Promise<Role[]> {
+  return roleRepository.listRoles(db, page, limit)
 }
 
-export async function getGroup(db: DbAdapter, groupId: string): Promise<Group | null> {
-  return groupRepository.findGroupById(db, groupId)
+export async function getRole(db: DbAdapter, roleId: string): Promise<Role | null> {
+  return roleRepository.findRoleById(db, roleId)
 }
 
-export async function createGroup(db: DbAdapter, input: GroupInput): Promise<Group> {
-  const existing = await groupRepository.findGroupByName(db, input.name)
-  if (existing) throw new Error('GROUP_NAME_TAKEN')
-  const group: Group = {
+export async function createRole(db: DbAdapter, input: RoleInput): Promise<Role> {
+  const existing = await roleRepository.findRoleByName(db, input.name)
+  if (existing) throw new Error('ROLE_NAME_TAKEN')
+  const role: Role = {
     id: crypto.randomUUID(),
     name: input.name,
     createdAt: new Date().toISOString(),
   }
-  await groupRepository.insertGroup(db, group)
-  return group
+  await roleRepository.insertRole(db, role)
+  return role
 }
 
-export async function updateGroup(
+export async function updateRole(
   db: DbAdapter,
-  groupId: string,
-  input: GroupInput,
+  roleId: string,
+  input: RoleInput,
   sysIds: SystemIds,
-): Promise<Group | null> {
-  // システムグループは変更不可
-  const systemGroups = [sysIds.userAdminGroupId, sysIds.bbsAdminGroupId, sysIds.adminGroupId, sysIds.generalGroupId]
-  if (systemGroups.includes(groupId)) {
-    throw new Error('CANNOT_MODIFY_SYSTEM_GROUP')
-  }
-  const updated = await groupRepository.updateGroup(db, groupId, input.name)
-  if (!updated) throw new Error('GROUP_NOT_FOUND')
-  return groupRepository.findGroupById(db, groupId)
+): Promise<Role | null> {
+  // システムロールは変更不可
+  const systemRoles = [sysIds.userAdminRoleId, sysIds.adminRoleId, sysIds.generalRoleId]
+  if (systemRoles.includes(roleId)) throw new Error('CANNOT_MODIFY_SYSTEM_ROLE')
+  const updated = await roleRepository.updateRole(db, roleId, input.name)
+  if (!updated) throw new Error('ROLE_NOT_FOUND')
+  return roleRepository.findRoleById(db, roleId)
 }
 
-export async function deleteGroup(
+export async function deleteRole(
   db: DbAdapter,
-  groupId: string,
+  roleId: string,
   sysIds: SystemIds,
 ): Promise<void> {
-  // システムグループは削除不可
-  const systemGroups = [sysIds.userAdminGroupId, sysIds.bbsAdminGroupId, sysIds.adminGroupId, sysIds.generalGroupId]
-  if (systemGroups.includes(groupId)) {
-    throw new Error('CANNOT_DELETE_SYSTEM_GROUP')
-  }
-  const deleted = await groupRepository.deleteGroup(db, groupId)
-  if (!deleted) throw new Error('GROUP_NOT_FOUND')
+  const systemRoles = [sysIds.userAdminRoleId, sysIds.adminRoleId, sysIds.generalRoleId]
+  if (systemRoles.includes(roleId)) throw new Error('CANNOT_DELETE_SYSTEM_ROLE')
+  const deleted = await roleRepository.deleteRole(db, roleId)
+  if (!deleted) throw new Error('ROLE_NOT_FOUND')
 }
 
-export async function addGroupMember(
+export async function addRoleMember(
   db: DbAdapter,
-  groupId: string,
+  roleId: string,
   userId: string,
 ): Promise<void> {
-  const group = await groupRepository.findGroupById(db, groupId)
-  if (!group) throw new Error('GROUP_NOT_FOUND')
+  const role = await roleRepository.findRoleById(db, roleId)
+  if (!role) throw new Error('ROLE_NOT_FOUND')
   const user = await userRepository.findUserById(db, userId)
   if (!user) throw new Error('USER_NOT_FOUND')
-  await groupRepository.insertUserGroup(db, userId, groupId)
+  await roleRepository.insertUserRole(db, userId, roleId)
 }
 
-export async function removeGroupMember(
+export async function removeRoleMember(
   db: DbAdapter,
-  groupId: string,
+  roleId: string,
   userId: string,
 ): Promise<void> {
-  const deleted = await groupRepository.deleteUserGroup(db, userId, groupId)
+  const deleted = await roleRepository.deleteUserRole(db, userId, roleId)
   if (!deleted) throw new Error('MEMBER_NOT_FOUND')
 }

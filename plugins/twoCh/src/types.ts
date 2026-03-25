@@ -20,12 +20,6 @@ export type Env = {
     TURNSTILE_SITE_KEY?: string
     // Turnstile シークレットキー (wrangler secret put TURNSTILE_SECRET_KEY)
     TURNSTILE_SECRET_KEY?: string
-    // スレッド作成時の owner_user_id / owner_group_id (未設定時は NULL)
-    THREAD_OWNER_USER?: string
-    THREAD_OWNER_GROUP?: string
-    // 投稿作成時の owner_user_id / owner_group_id (未設定時は NULL)
-    POST_OWNER_USER?: string
-    POST_OWNER_GROUP?: string
     // KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止)
     KV_PREFIX?: string
   }
@@ -43,11 +37,12 @@ export type BoardRow = {
   category: string | null
   default_poster_name: string
   default_thread_permissions: string
+  default_post_permissions: string
   // SETTING.TXT 用フィールド
   max_thread_title_length: number
   default_max_post_lines: number
   default_max_poster_name_length: number
-  default_max_poster_sub_info_length: number
+  default_max_poster_option_length: number
   default_max_post_length: number
 }
 
@@ -63,8 +58,8 @@ export type ThreadRow = {
 export type PostRow = {
   post_number: number
   poster_name: string
-  poster_sub_info: string | null
-  display_user_id: string
+  poster_option_info: string | null
+  author_id: string
   content: string
   created_at: string
   is_deleted: number  // 1=削除済み

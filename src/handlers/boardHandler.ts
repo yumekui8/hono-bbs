@@ -2,12 +2,10 @@ import type { Context } from 'hono'
 import { isZodError, zodMessage } from '../utils/zodHelper'
 import type { AppEnv, Board } from '../types'
 import * as boardService from '../services/boardService'
-import { getSystemIds } from '../utils/constants'
-import { parseEndpointPermissions, getEndpointPermConfig } from '../utils/endpointPermissions'
 
-// userAdminGroup または bbsAdminGroup メンバーのみ adminMeta を参照できる
+// isSysAdmin または isUserAdmin のみ adminMeta を参照できる
 function adminVisible(c: Context<AppEnv>): boolean {
-  return c.get('isAdmin') || c.get('isUserAdmin')
+  return c.get('isSysAdmin') || c.get('isUserAdmin')
 }
 
 function stripAdminMeta(board: Board, visible: boolean): Board | Omit<Board, 'adminMeta'> {
@@ -18,55 +16,40 @@ function stripAdminMeta(board: Board, visible: boolean): Board | Omit<Board, 'ad
 
 // GET /boards
 export async function getBoardsHandler(c: Context<AppEnv>): Promise<Response> {
-  const boards = await boardService.getBoards(c.get('db'), c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'))
+  const boards = await boardService.getBoards(c.get('db'), c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'))
   const visible = adminVisible(c)
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-  const endpointConfig = getEndpointPermConfig('/boards', customPerms, sysIds)
-  return c.json({
-    data: boards.map(b => stripAdminMeta(b, visible)),
-    endpoint: endpointConfig,
-  })
+  return c.json({ data: boards.map(b => stripAdminMeta(b, visible)) })
 }
 
-// POST /boards
+// POST /boards (sys admin のみ)
 export async function createBoardHandler(c: Context<AppEnv>): Promise<Response> {
-  const sysIds = getSystemIds(c.env)
-  const customPerms = parseEndpointPermissions(c.env.ENDPOINT_PERMISSIONS)
-
-  // /boards コレクションの POST 権限チェック
-  const allowed = boardService.checkBoardsCollectionPermission(
-    c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
-    customPerms, sysIds,
-  )
-  if (!allowed) {
-    return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions to create board' }, 403)
-  }
-
   try {
     const body = await c.req.json()
-    const input = boardService.parseCreateBoard(body)
+    const input = boardService.parseBoardBody(body)
     const board = await boardService.createBoard(
-      c.get('db'), input, c.get('userId'), c.get('primaryGroupId'),
+      c.get('db'), input, c.get('userId'), c.get('isSysAdmin'),
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
     return c.json({ data: stripAdminMeta(board, adminVisible(c)) }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
+    if (e instanceof Error && e.message === 'FORBIDDEN') {
+      return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
+    }
     throw e
   }
 }
 
-// PUT /boards/:boardId
-export async function updateBoardHandler(c: Context<AppEnv>): Promise<Response> {
+// PUT /boards/:boardId (name/description/category のみ更新)
+export async function putBoardHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   try {
     const body = await c.req.json()
     const input = boardService.parseUpdateBoard(body)
-    const board = await boardService.updateBoard(
+    const board = await boardService.putBoard(
       c.get('db'), boardId, input,
-      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!board) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
     return c.json({ data: stripAdminMeta(board, adminVisible(c)) })
@@ -79,13 +62,36 @@ export async function updateBoardHandler(c: Context<AppEnv>): Promise<Response> 
   }
 }
 
+// PATCH /boards/:boardId (upsert: 権限・設定全般更新)
+export async function patchBoardHandler(c: Context<AppEnv>): Promise<Response> {
+  const boardId = c.req.param('boardId')
+  try {
+    const body = await c.req.json()
+    const input = boardService.parseBoardBody(body)
+    const board = await boardService.patchBoard(
+      c.get('db'), boardId, input,
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
+      c.req.header('X-Session-Id') ?? null,
+      c.req.header('X-Turnstile-Session') ?? null,
+    )
+    return c.json({ data: stripAdminMeta(board, adminVisible(c)) })
+  } catch (e) {
+    if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
+    if (e instanceof Error) {
+      if (e.message === 'FORBIDDEN') return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)
+      if (e.message === 'BOARD_NOT_FOUND') return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
+    }
+    throw e
+  }
+}
+
 // DELETE /boards/:boardId
 export async function deleteBoardHandler(c: Context<AppEnv>): Promise<Response> {
   const boardId = c.req.param('boardId')
   try {
     const deleted = await boardService.deleteBoard(
       c.get('db'), boardId,
-      c.get('userId'), c.get('userGroupIds'), c.get('isAdmin'),
+      c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!deleted) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
     return new Response(null, { status: 204 })
