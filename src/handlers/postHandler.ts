@@ -33,8 +33,8 @@ export async function getPostHandler(c: Context<AppEnv>): Promise<Response> {
     c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
   )
   if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-  const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-  const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+  const dn = c.env.DELETED_POSTER_NAME ?? ''
+  const dc = c.env.DELETED_CONTENT    ?? ''
   return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
 }
 

@@ -78,8 +78,8 @@ export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   )
   if (!result) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
   const visible = adminVisible(c)
-  const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-  const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+  const dn = c.env.DELETED_POSTER_NAME ?? ''
+  const dc = c.env.DELETED_CONTENT    ?? ''
   return c.json({
     data: {
       board: result.board,
@@ -113,8 +113,8 @@ export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Res
   )
   if (!result) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
   const visible = adminVisible(c)
-  const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-  const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
+  const dn = c.env.DELETED_POSTER_NAME ?? ''
+  const dc = c.env.DELETED_CONTENT    ?? ''
   return c.json({
     data: {
       thread: stripThread(result.thread, visible, dn, dc),
