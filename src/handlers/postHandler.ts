@@ -7,14 +7,14 @@ function adminVisible(c: Context<AppEnv>): boolean {
   return c.get('isSysAdmin') || c.get('isUserAdmin')
 }
 
-// 削除済み投稿のコンテンツをマスク (poster_name / content を置換)
-function maskDeletedPost(post: Post, deletedPosterName: string, deletedContent: string): Post {
+// 削除済み投稿のコンテンツをマスク (表示系フィールドを空文字に置換)
+function maskDeletedPost(post: Post): Post {
   if (!post.isDeleted) return post
-  return { ...post, posterName: deletedPosterName, posterOptionInfo: '', content: deletedContent }
+  return { ...post, posterName: '', posterOptionInfo: '', authorId: '', content: '' }
 }
 
-function stripPost(post: Post, visible: boolean, deletedPosterName: string, deletedContent: string): Post | Omit<Post, 'adminMeta'> {
-  const masked = maskDeletedPost(post, deletedPosterName, deletedContent)
+function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
+  const masked = maskDeletedPost(post)
   if (visible) return masked
   const { adminMeta: _dropped, ...rest } = masked
   return rest
@@ -33,9 +33,7 @@ export async function getPostHandler(c: Context<AppEnv>): Promise<Response> {
     c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
   )
   if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-  const dn = c.env.DELETED_POSTER_NAME ?? ''
-  const dc = c.env.DELETED_CONTENT    ?? ''
-  return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
+  return c.json({ data: stripPost(post, adminVisible(c)) })
 }
 
 // POST /boards/:boardId/:threadId - 投稿作成
@@ -51,9 +49,7 @@ export async function createPostHandler(c: Context<AppEnv>): Promise<Response> {
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) }, 201)
+    return c.json({ data: stripPost(post, adminVisible(c)) }, 201)
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error) {
@@ -83,9 +79,7 @@ export async function putPostHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
+    return c.json({ data: stripPost(post, adminVisible(c)) })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'FORBIDDEN') {
@@ -111,9 +105,7 @@ export async function patchPostHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
+    return c.json({ data: stripPost(post, adminVisible(c)) })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'FORBIDDEN') {
@@ -137,9 +129,7 @@ export async function deletePostHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!post) return c.json({ error: 'POST_NOT_FOUND', message: 'Post not found' }, 404)
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripPost(post, adminVisible(c), dn, dc) })
+    return c.json({ data: stripPost(post, adminVisible(c)) })
   } catch (e) {
     if (e instanceof Error && e.message === 'FORBIDDEN') {
       return c.json({ error: 'FORBIDDEN', message: 'Insufficient permissions' }, 403)

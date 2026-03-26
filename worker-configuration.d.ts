@@ -18,9 +18,7 @@ declare namespace Cloudflare {
 		CORS_ORIGIN: string;
 		BBS_ALLOW_DOMAIN: string;
 		MAX_REQUEST_SIZE: string;
-		DELETED_POSTER_NAME: string;
-		DELETED_CONTENT: string;
-		KV_PREFIX: string;
+KV_PREFIX: string;
 	}
 }
 interface CloudflareBindings extends Cloudflare.Env {}

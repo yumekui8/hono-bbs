@@ -118,9 +118,8 @@ hono-bbs/
 | `postHandler.ts` | 投稿 CRUD / 削除済み投稿マスク |
 
 **削除済み投稿のマスク処理**: `maskDeletedPost()` 関数で、`isDeleted=true` の投稿は
-`posterName` / `posterOptionInfo` / `content` を環境変数 `DELETED_POSTER_NAME` /
-`DELETED_CONTENT` の値（デフォルト: 空文字）に置き換えてレスポンスする。
-表示テキストの制御はフロントエンド側で行う前提。
+`posterName` / `posterOptionInfo` / `authorId` / `content` を空文字 `""` に置き換えてレスポンスする。
+削除テキストの表示 (「あぼーん」等) はフロントエンド側で行う。
 
 ---
 

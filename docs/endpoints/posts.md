@@ -8,7 +8,7 @@
 
 - **PUT**: 投稿内容 (本文・名前等) の更新。`isEdited` フラグが立つ。
 - **PATCH**: 投稿の権限設定 (`administrators`、`members`、`permissions`) の変更。
-- **DELETE**: ソフトデリート。物理削除はなし。削除後も投稿番号は保持され、本文・名前は `DELETED_CONTENT`・`DELETED_POSTER_NAME` 環境変数の値に置き換えられる。
+- **DELETE**: ソフトデリート。物理削除はなし。`isDeleted` フラグが `true` になり、表示系フィールドが空文字に置き換えられる。削除テキストの表示はフロントエンド側で行う。
 
 ### Post スキーマ
 
@@ -37,17 +37,23 @@
 }
 ```
 
-#### ソフトデリート後のレスポンス例
+#### ソフトデリート後のレスポンス
 
-`isDeleted: true` の投稿は本文・名前が環境変数の値に置き換えられる。
+`isDeleted: true` の投稿は `posterName`・`posterOptionInfo`・`authorId`・`content` が空文字 `""` に置き換えられる。
+投稿番号・`createdAt` 等その他フィールドはそのまま保持される。
+削除テキストの表示 (「あぼーん」等) はフロントエンド側で行う。
 
 ```json
 {
   "postNumber": 3,
-  "posterName": "あぼーん",
+  "posterName": "",
   "posterOptionInfo": "",
-  "content": "このレスは削除されました",
-  "isDeleted": true
+  "authorId": "",
+  "content": "",
+  "isDeleted": true,
+  "isEdited": false,
+  "editedAt": null,
+  "createdAt": "2026-01-01T00:00:00.000Z"
 }
 ```
 

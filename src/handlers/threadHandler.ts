@@ -51,20 +51,20 @@ function adminVisible(c: Context<AppEnv>): boolean {
   return c.get('isSysAdmin') || c.get('isUserAdmin')
 }
 
-function stripThread(thread: Thread, visible: boolean, deletedPosterName: string, deletedContent: string) {
+function stripThread(thread: Thread, visible: boolean) {
   const { adminMeta, ...rest } = thread
   if (visible) return { ...rest, adminMeta }
   return rest
 }
 
-// 削除済み投稿のコンテンツをマスク
-function maskDeletedPost(post: Post, deletedPosterName: string, deletedContent: string): Post {
+// 削除済み投稿のコンテンツをマスク (表示系フィールドを空文字に置換)
+function maskDeletedPost(post: Post): Post {
   if (!post.isDeleted) return post
-  return { ...post, posterName: deletedPosterName, posterOptionInfo: '', content: deletedContent }
+  return { ...post, posterName: '', posterOptionInfo: '', authorId: '', content: '' }
 }
 
-function stripPost(post: Post, visible: boolean, deletedPosterName: string, deletedContent: string): Post | Omit<Post, 'adminMeta'> {
-  const masked = maskDeletedPost(post, deletedPosterName, deletedContent)
+function stripPost(post: Post, visible: boolean): Post | Omit<Post, 'adminMeta'> {
+  const masked = maskDeletedPost(post)
   if (visible) return masked
   const { adminMeta: _dropped, ...rest } = masked
   return rest
@@ -78,12 +78,10 @@ export async function getThreadsHandler(c: Context<AppEnv>): Promise<Response> {
   )
   if (!result) return c.json({ error: 'BOARD_NOT_FOUND', message: 'Board not found' }, 404)
   const visible = adminVisible(c)
-  const dn = c.env.DELETED_POSTER_NAME ?? ''
-  const dc = c.env.DELETED_CONTENT    ?? ''
   return c.json({
     data: {
       board: result.board,
-      threads: result.threads.map(t => stripThread(t, visible, dn, dc)),
+      threads: result.threads.map(t => stripThread(t, visible)),
     },
   })
 }
@@ -113,12 +111,10 @@ export async function getThreadWithPostsHandler(c: Context<AppEnv>): Promise<Res
   )
   if (!result) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
   const visible = adminVisible(c)
-  const dn = c.env.DELETED_POSTER_NAME ?? ''
-  const dc = c.env.DELETED_CONTENT    ?? ''
   return c.json({
     data: {
-      thread: stripThread(result.thread, visible, dn, dc),
-      posts: result.posts.map(p => stripPost(p, visible, dn, dc)),
+      thread: stripThread(result.thread, visible),
+      posts: result.posts.map(p => stripPost(p, visible)),
     },
   })
 }
@@ -136,12 +132,10 @@ export async function createThreadHandler(c: Context<AppEnv>): Promise<Response>
       c.req.header('X-Turnstile-Session') ?? null,
     )
     const visible = adminVisible(c)
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
     return c.json({
       data: {
-        thread: stripThread(result.thread, visible, dn, dc),
-        firstPost: stripPost(result.firstPost, visible, dn, dc),
+        thread: stripThread(result.thread, visible),
+        firstPost: stripPost(result.firstPost, visible),
       },
     }, 201)
   } catch (e) {
@@ -172,9 +166,7 @@ export async function putThreadHandler(c: Context<AppEnv>): Promise<Response> {
       c.get('userId'), c.get('userRoleIds'), c.get('isSysAdmin'),
     )
     if (!thread) return c.json({ error: 'THREAD_NOT_FOUND', message: 'Thread not found' }, 404)
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripThread(thread, adminVisible(c), dn, dc) })
+    return c.json({ data: stripThread(thread, adminVisible(c)) })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error && e.message === 'FORBIDDEN') {
@@ -197,9 +189,7 @@ export async function patchThreadHandler(c: Context<AppEnv>): Promise<Response> 
       c.req.header('X-Session-Id') ?? null,
       c.req.header('X-Turnstile-Session') ?? null,
     )
-    const dn = c.env.DELETED_POSTER_NAME ?? 'あぼーん'
-    const dc = c.env.DELETED_CONTENT    ?? 'このレスは削除されました'
-    return c.json({ data: stripThread(thread, adminVisible(c), dn, dc) })
+    return c.json({ data: stripThread(thread, adminVisible(c)) })
   } catch (e) {
     if (isZodError(e)) return c.json({ error: 'VALIDATION_ERROR', message: zodMessage(e) }, 400)
     if (e instanceof Error) {

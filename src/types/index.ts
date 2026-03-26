@@ -129,8 +129,6 @@ export type AppEnv = {
     USER_ADMIN_ROLE?: string       // ユーザ管理ロールID (デフォルト: user-admin-role)
     // ── API 設定 ─────────────────────────────────────────────────
     MAX_REQUEST_SIZE?: string
-    DELETED_POSTER_NAME?: string
-    DELETED_CONTENT?: string
     API_BASE_PATH: string
     CORS_ORIGIN?: string
     BBS_ALLOW_DOMAIN?: string

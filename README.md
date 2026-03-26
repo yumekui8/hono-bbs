@@ -210,8 +210,6 @@ npx wrangler secret delete ADMIN_INITIAL_PASSWORD
 | `USER_DISPLAY_LIMIT` | — | ユーザー一覧の 1 ページあたり件数 (`0` = 無制限) | `0` |
 | `ROLE_DISPLAY_LIMIT` | — | ロール一覧の 1 ページあたり件数 (`0` = 無制限) | `0` |
 | `MAX_REQUEST_SIZE` | — | リクエストボディサイズ上限 (例: `"1mb"`, `"500kb"`) | 無制限 |
-| `DELETED_POSTER_NAME` | — | ソフトデリート済み投稿の名前欄 | `あぼーん` |
-| `DELETED_CONTENT` | — | ソフトデリート済み投稿の本文 | `このレスは削除されました` |
 | `KV_PREFIX` | — | KV グローバルプレフィックス (複数インスタンス共存時) | — |
 
 > Turnstile 関連の設定 (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` 等) は **turnstileApiToken プラグイン** 側の設定です。詳細は [`docs/env-vars.md`](./docs/env-vars.md) を参照してください。

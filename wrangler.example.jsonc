@@ -22,9 +22,7 @@
 		// ADMIN_INITIAL_PASSWORD: admin 初期パスワード (POST /auth/setup で使用、設定後削除推奨)
 		// ADMIN_USERNAME:         管理者ユーザ ID (デフォルト: admin)
 		// USER_ADMIN_ROLE:        ユーザ管理ロール ID (デフォルト: user-admin-role)
-		// DELETED_POSTER_NAME:    ソフトデリート済み投稿の名前欄 (デフォルト: あぼーん)
-		// DELETED_CONTENT:        ソフトデリート済み投稿の本文 (デフォルト: このレスは削除されました)
-		// KV_PREFIX:              KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止)
+// KV_PREFIX:              KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止)
 	},
 	"kv_namespaces": [
 		{

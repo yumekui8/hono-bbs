@@ -170,8 +170,6 @@
 | `BBS_ALLOW_DOMAIN` | 許可するドメイン (カンマ区切り、未設定で制限なし) | — |
 | `USER_DISPLAY_LIMIT` | ユーザー一覧の1ページあたり件数 (0=無制限) | `0` |
 | `ROLE_DISPLAY_LIMIT` | ロール一覧の1ページあたり件数 (0=無制限) | `0` |
-| `DELETED_POSTER_NAME` | ソフトデリート済み投稿の名前欄マスク文字列 | `あぼーん` |
-| `DELETED_CONTENT` | ソフトデリート済み投稿の本文マスク文字列 | `このレスは削除されました` |
 
 > **Turnstile 関連の設定** (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` 等) は **turnstileApiToken プラグイン** 側の設定です。
 > hono-bbs 本体が参照するのは `ENABLE_TURNSTILE` と `SESSION_KV` のみです。

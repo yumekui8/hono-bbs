@@ -239,8 +239,6 @@ npm run cf-typegen
 | `MAX_REQUEST_SIZE` | | — | リクエストボディサイズ上限 (例: `1mb`, `500kb`) |
 | `USER_DISPLAY_LIMIT` | | `0` | ユーザ一覧の1ページあたり件数 (0=無制限) |
 | `ROLE_DISPLAY_LIMIT` | | `0` | ロール一覧の1ページあたり件数 (0=無制限) |
-| `DELETED_POSTER_NAME` | | `あぼーん` | ソフトデリート済み投稿の名前欄 |
-| `DELETED_CONTENT` | | `このレスは削除されました` | ソフトデリート済み投稿の本文 |
 | `KV_PREFIX` | | — | KV グローバルプレフィックス (複数インスタンス共存時のキー衝突防止) |
 
 > Turnstile 関連の設定 (`TURNSTILE_SITE_KEY` 等) は **turnstileApiToken プラグイン** 側の設定です。
