@@ -177,6 +177,7 @@ export async function turnstileVerifyHandler(c: Context<PluginEnv>): Promise<Res
 
   const result = await service.issueTurnstileSession(
     c.get('kv'), body.token, c.env.TURNSTILE_SECRET_KEY, clientIP, userAgent, ttlMinutes,
+    c.env.TURNSTILE_SESSION_PEPPER ?? '',
   )
   if (!result.sessionId) {
     if (result.errorCodes?.includes('kv-write-failed')) {

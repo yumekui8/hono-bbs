@@ -16,17 +16,17 @@ export function parseTurnstileTtl(raw: string | undefined): { minutes: number; l
   return { minutes, label: `${Math.round(minutes / (60 * 24 * 365))} 年` }
 }
 
-// クライアントIP + UA + 日付(UTC)からルックアップキーを生成する
-// このハッシュは KV 内部でのみ使用し、クライアントには渡さない
-async function computeLookupKey(ip: string, userAgent: string, date: string): Promise<string> {
-  const raw = `${ip}:${userAgent}:${date}`
+// IP + UA + 日付(UTC) + ペッパー からセッションIDを生成する
+// ペッパーはシークレットとして環境変数で管理する
+async function computeSessionId(ip: string, userAgent: string, date: string, pepper: string): Promise<string> {
+  const raw = `${ip}:${userAgent}:${date}:${pepper}`
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
 // Turnstile トークンを検証してセッションを発行する
-// 同一クライアントから同日に既にセッションが存在する場合は KV 書き込みなしで alreadyIssued: true を返す
-// セッションIDは毎回 crypto.randomUUID() で生成するため外部から予測不可能
+// セッションIDは hash(IP+UA+日付+ペッパー) で決定論的に生成するため、
+// 同一クライアント・同日の重複発行を KV lookup なしで dedup できる (KV 書き込みは1回のみ)
 // ttlMinutes: セッション有効期限 (分単位)。0 = 無期限 (デフォルト: 525600 = 1年)
 export async function issueTurnstileSession(
   kv: KvAdapter,
@@ -35,19 +35,20 @@ export async function issueTurnstileSession(
   clientIP: string,
   userAgent: string,
   ttlMinutes: number = 525600,
+  pepper: string = '',
 ): Promise<TurnstileResult> {
   if (!secretKey) {
     console.error('[Turnstile] TURNSTILE_SECRET_KEY is not configured')
     return { sessionId: null, errorCodes: ['secret-not-configured'] }
   }
 
-  // hash(IP+UA+date) で既存セッションIDを引く (同一端末・同日の dedup)
   const today = new Date().toISOString().slice(0, 10) // UTC YYYY-MM-DD
-  const lookupKey = await computeLookupKey(clientIP, userAgent, today)
-  const existingSessionId = await repository.findSessionIdByLookupKey(kv, lookupKey)
-  if (existingSessionId) {
-    // KV 書き込みなしで既存のランダムセッションIDを返す
-    return { sessionId: existingSessionId, alreadyIssued: true }
+  const sessionId = await computeSessionId(clientIP, userAgent, today, pepper)
+
+  // 同一端末・同日のセッションが既に存在すれば KV 書き込みなしで返す
+  const existing = await repository.findTurnstileSessionById(kv, sessionId)
+  if (existing) {
+    return { sessionId, alreadyIssued: true }
   }
 
   // Cloudflare siteverify
@@ -69,11 +70,9 @@ export async function issueTurnstileSession(
   const expiresAt = ttlMinutes === 0
     ? '9999-12-31T23:59:59.999Z'
     : new Date(now.getTime() + ttlMinutes * 60 * 1000).toISOString()
-  // セッションIDは乱数 UUID で生成 — hash(IP+UA+date) は外部に渡さない
-  const sessionId = crypto.randomUUID()
   const session: TurnstileSession = { id: sessionId, createdAt: now.toISOString(), expiresAt }
   try {
-    await repository.insertTurnstileSession(kv, session, lookupKey, ttlMinutes)
+    await repository.insertTurnstileSession(kv, session, ttlMinutes)
   } catch (e) {
     console.error('[Turnstile] KV write failed:', e)
     return { sessionId: null, errorCodes: ['kv-write-failed'] }

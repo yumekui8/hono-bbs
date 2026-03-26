@@ -14,6 +14,7 @@ export type PluginEnv = {
     SESSION_KV: KVNamespace
     TURNSTILE_SITE_KEY: string | undefined
     TURNSTILE_SECRET_KEY: string | undefined
+    TURNSTILE_SESSION_PEPPER: string | undefined    // セッションID生成用ペッパー (推奨: wrangler secret put で設定)
     DISABLE_TURNSTILE: string | undefined           // 'true' でスキップ (ローカル開発用)
     TURNSTILE_TOKEN_TTL: string | undefined         // 有効期限 (分単位, 0=無期限, デフォルト: 525600=1年)
     TURNSTILE_PATH: string | undefined              // このWorkerがマウントされるパス (デフォルト: /auth/turnstile)

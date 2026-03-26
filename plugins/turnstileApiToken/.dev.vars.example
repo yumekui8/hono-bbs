@@ -12,6 +12,12 @@ TURNSTILE_SITE_KEY=your-site-key
 # 本番環境は wrangler secret put TURNSTILE_SECRET_KEY で設定することを推奨
 TURNSTILE_SECRET_KEY=your-secret-key
 
+# Turnstile セッションID生成用ペッパー
+# IP + UA + 日付 + ペッパー の SHA-256 ハッシュをセッションIDとして使用する
+# 設定するとセッションIDの予測が困難になる (推奨: wrangler secret put TURNSTILE_SESSION_PEPPER)
+# 未設定の場合はペッパーなしで動作する (セキュリティ上は設定を強く推奨)
+# TURNSTILE_SESSION_PEPPER=your-random-pepper
+
 # ローカル開発時に Turnstile 検証をスキップする場合は true に設定
 # DISABLE_TURNSTILE=true
 
