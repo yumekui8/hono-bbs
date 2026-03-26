@@ -70,7 +70,7 @@ export async function issueTurnstileSession(
   const expiresAt = ttlMinutes === 0
     ? '9999-12-31T23:59:59.999Z'
     : new Date(now.getTime() + ttlMinutes * 60 * 1000).toISOString()
-  const session: TurnstileSession = { id: sessionId, createdAt: now.toISOString(), expiresAt }
+  const session: TurnstileSession = { id: sessionId, createdAt: now.toISOString(), expiresAt, clientIP, userAgent }
   try {
     await repository.insertTurnstileSession(kv, session, ttlMinutes)
   } catch (e) {

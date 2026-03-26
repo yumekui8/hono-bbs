@@ -16,10 +16,17 @@ function parseCookieValue(cookieHeader: string | null, name: string): string | n
   return null
 }
 
+type EdgeTokenValue = {
+  authed: boolean
+  expiresAt: string
+  clientIP: string
+  userAgent: string
+}
+
 // SESSION_KV の edge_token:{uuid} エントリを確認し、認証済みなら true を返す
 // eddiner 方式: 専用ブラウザが Set-Cookie で受け取った UUID をブラウザ認証後に有効化する
 async function checkEdgeToken(kv: KvAdapter, uuid: string): Promise<boolean> {
-  const data = await kv.get<{ authed: boolean; expiresAt: string }>('edge_token:' + uuid, 'json')
+  const data = await kv.get<EdgeTokenValue>('edge_token:' + uuid, 'json')
   if (!data) return false
   if (new Date(data.expiresAt) < new Date()) {
     await kv.delete('edge_token:' + uuid)
@@ -32,10 +39,11 @@ async function checkEdgeToken(kv: KvAdapter, uuid: string): Promise<boolean> {
 // UUID を発行して KV に未認証状態で保存し、Set-Cookie + 認証 URL を返す
 // ユーザがブラウザで認証 URL を開いて Turnstile を通過すると KV が認証済みに更新される
 // siteUrl: このWorkerのベースURL (SITE_URL 環境変数。末尾スラッシュなし)
-async function edgeTokenChallenge(kv: KvAdapter, siteUrl: string): Promise<Response> {
+async function edgeTokenChallenge(kv: KvAdapter, siteUrl: string, clientIP: string, userAgent: string): Promise<Response> {
   const uuid      = crypto.randomUUID()
   const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString()
-  await kv.put('edge_token:' + uuid, JSON.stringify({ authed: false, expiresAt }), {
+  const value: EdgeTokenValue = { authed: false, expiresAt, clientIP, userAgent }
+  await kv.put('edge_token:' + uuid, JSON.stringify(value), {
     expirationTtl: 86400, // 24 時間
   })
   const authUrl = siteUrl
@@ -142,16 +150,19 @@ export async function twoChTurnstileVerifyHandler(c: Context<Env>): Promise<Resp
 
   // edge-token を認証済みに更新する
   const kv = c.get('kv') as KvAdapter
-  const existing = await kv.get<{ authed: boolean; expiresAt: string }>(
+  const existing = await kv.get<EdgeTokenValue>(
     'edge_token:' + body.edge_token, 'json',
   )
   if (!existing) {
     return c.json({ ok: false, error: 'EDGE_TOKEN_NOT_FOUND' }, 400)
   }
+  const clientIP  = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Real-IP') ?? 'unknown'
+  const userAgent = c.req.header('User-Agent') ?? 'unknown'
   const remainSec = Math.max(1, Math.floor((new Date(existing.expiresAt).getTime() - Date.now()) / 1000))
+  const updated: EdgeTokenValue = { authed: true, expiresAt: existing.expiresAt, clientIP, userAgent }
   await kv.put(
     'edge_token:' + body.edge_token,
-    JSON.stringify({ authed: true, expiresAt: existing.expiresAt }),
+    JSON.stringify(updated),
     { expirationTtl: remainSec },
   )
 
@@ -419,9 +430,11 @@ export async function writeCgiHandler(c: Context<Env>): Promise<Response> {
   if (c.env.ENABLE_TURNSTILE === 'true') {
     const siteUrl         = (c.env.SITE_URL ?? '').replace(/\/$/, '')
     const edgeTokenCookie = parseCookieValue(c.req.header('Cookie') ?? null, 'edge-token')
+    const reqIP           = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Real-IP') ?? 'unknown'
+    const reqUA           = c.req.header('User-Agent') ?? 'unknown'
 
     if (!edgeTokenCookie || !(await checkEdgeToken(kv, edgeTokenCookie))) {
-      return await edgeTokenChallenge(kv, siteUrl)
+      return await edgeTokenChallenge(kv, siteUrl, reqIP, reqUA)
     }
   }
 

@@ -6,6 +6,8 @@ export type TurnstileSession = {
   id: string
   createdAt: string
   expiresAt: string
+  clientIP: string
+  userAgent: string
 }
 
 export type PluginEnv = {
